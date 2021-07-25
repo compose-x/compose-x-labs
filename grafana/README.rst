@@ -1,3 +1,7 @@
+.. meta::
+    :description: ECS Compose-X Labs
+    :keywords: AWS, AWS ECS, Docker, Compose, docker-compose, grafana, cognito, azure
+
 =====================================
 grafana with Azure and AWS Cognito
 =====================================

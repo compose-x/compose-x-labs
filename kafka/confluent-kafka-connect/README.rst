@@ -1,3 +1,6 @@
+.. meta::
+    :description: ECS Compose-X Labs
+    :keywords: AWS, AWS ECS, Docker, Compose, docker-compose, kafka, connect, confluent
 
 =============================
 Kafka Connect  - Confluent
