@@ -92,7 +92,7 @@ html_theme = "sphinx_material"
 #
 html_theme_options = {
     # Set the name of the project to appear in the navigation.
-    "nav_title": "ECR Scan Reporter",
+    "nav_title": "Compose-X Labs",
     # Set you GA account ID to enable tracking
     # 'google_analytics_account': 'UA-XXXXX',
     # Specify a base_url used to generate sitemap.xml. If not
