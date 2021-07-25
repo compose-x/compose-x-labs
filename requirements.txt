@@ -1,0 +1,5 @@
+Sphinx==4.1.0
+sphinx-material==0.0.34
+black==21.6b0
+pre-commit==2.9.3
+tbump==6.3.1

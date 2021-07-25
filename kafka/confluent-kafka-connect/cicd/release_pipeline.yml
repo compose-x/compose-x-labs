@@ -1,0 +1,753 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Pipeline to build, deploy, test and promote application.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Repository Settings
+        Parameters:
+          - ApplicationRepositoryName
+          - BranchName
+          - GithubOrganization
+          - GithubToken
+      - Label:
+          default: Build Compute Settings
+        Parameters:
+          - BuildComputeConfiguration
+          - Environment
+      - Label:
+          default: Contact details
+        Parameters:
+          - ProductionContactEmail
+      - Label:
+          default: Mandatory tags.
+        Parameters:
+          - CostcentreTag
+          - ProjectTag
+          - EnvironmentTag
+          - OwnerTag
+          - LiveTag
+    ParameterLabels:
+      - ArtifactsBucketName:
+          default: Bucket storing the CodeBuild and CodePipeline artifacts
+      - CloudformationTemplatesBucketName:
+          default: Bucket storing the CloudFormation templates and configurations generated
+      - NonProdAccountCfnRoleArn:
+          default: SSM Path to the NonProd CloudFormation Role ARN
+      - NonProdAccountPipelineRoleArn:
+          default: SSM Path to the NonProd CodePipeline Role ARN
+      - ProdAccountCfnRoleArn:
+          default: SSM Path to the Prod CloudFormation Role ARN
+      - ProdAccountPipelineRoleArn:
+          default: SSM Path to the Prod CodePipeline Role ARN
+      - GithubToken:
+          default: Name of the GH secret storing the Developer Token
+      - GithubOrganization:
+          default: Name of the Github organization where the repository resides
+      - ExecuteTestsRemotely:
+          default: Whether CodePipeline should assume role to execute the build.
+Parameters:
+
+  DeploymentName:
+    Type: String
+    AllowedPattern: "[a-zA-Z0-9-]+$"
+
+  DeployToProd:
+    Type: String
+    AllowedValues:
+      - True
+      - False
+    Default: False
+
+  ProductionContactEmail:
+    Type: String
+
+  GithubToken:
+    Type: String
+    Default: /cicd/shared/github.com/token
+
+  ApplicationRepositoryName:
+    Type: String
+
+  BranchName:
+    Type: String
+    Default: main
+
+  GithubOrganization:
+    Type: String
+
+  BuildComputeConfiguration:
+    Type: String
+    Default: Small
+    AllowedValues:
+      - Small
+      - Medium
+      - Large
+
+  Environment:
+    Type: String
+    Default: aws/codebuild/standard:5.0
+    AllowedValues:
+      - aws/codebuild/standard:5.0
+      - aws/codebuild/standard:4.0
+
+  CostcentreTag:
+    AllowedPattern: '[\x20-\x7E]+'
+    ConstraintDescription: Must be ASCII
+    MaxLength: 128
+    MinLength: 2
+    Type: String
+  EnvironmentTag:
+    AllowedPattern: '[\x20-\x7E]+'
+    ConstraintDescription: Must be ASCII
+    MaxLength: 128
+    MinLength: 2
+    Type: String
+    Default: management
+  OwnerTag:
+    AllowedPattern: '[\x20-\x7E]+'
+    ConstraintDescription: Must be ASCII
+    MaxLength: 128
+    MinLength: 2
+    Type: String
+    Default: supply-chain
+  ProjectTag:
+    AllowedPattern: '[\x20-\x7E]+'
+    ConstraintDescription: Must be ASCII
+    MaxLength: 128
+    MinLength: 2
+    Type: String
+  LiveTag:
+    Type: String
+    AllowedValues:
+      - "yes"
+      - "no"
+    Default: "no"
+
+Mappings:
+  CodeBuild:
+    EnvironmentSize:
+      Small: BUILD_GENERAL1_SMALL
+      Medium: BUILD_GENERAL1_MEDIUM
+      Large: BUILD_GENERAL1_LARGE
+
+Conditions:
+  DeployToProdCondition: !Equals
+    - !Ref DeployToProd
+    - True
+
+Resources:
+  KmsKeyAccessPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: 'CicdKmsKeyAccess'
+      Roles:
+        - !Ref CodeBuildRole
+        - !Ref CodePipelineRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: DecryptEncryptArtifacts
+            Effect: Allow
+            Action:
+              - kms:DescribeKey
+              - kms:GenerateDataKey*
+              - kms:Encrypt
+              - kms:ReEncrypt*
+              - kms:Decrypt
+            Resource:
+              - !ImportValue "CICD::mgmt::KMS::Key::Arn"
+
+  S3BucketsReadAccess:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref CodeBuildRole
+        - !Ref CodePipelineRole
+      PolicyName: S3CicdBucketsReadAccess
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowRwToArtifactsBucket
+            Action:
+              - s3:ListBucket
+              - s3:GetBucket*
+            Effect: Allow
+            Resource:
+              - !ImportValue "CICD::mgmt::Bucket::Artifacts::Arn"
+              - !ImportValue "CICD::mgmt::Bucket::CfnTemplates::Arn"
+          - Sid: GetCloudformationTemplates
+            Action:
+              - s3:GetObject*
+              - s3:ListBucket
+              - s3:GetBucket*
+              - s3:PutObject*
+            Effect: Allow
+            Resource:
+              - Fn::Sub:
+                  - '${ArtifactsBucketArn}/*'
+                  - ArtifactsBucketArn: !ImportValue "CICD::mgmt::Bucket::Artifacts::Arn"
+              - Fn::Sub:
+                  - '${CloudformationTemplatesBucketArn}/*'
+                  - CloudformationTemplatesBucketArn: !ImportValue "CICD::mgmt::Bucket::CfnTemplates::Arn"
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Tags:
+        - Key: costcentre
+          Value: !Ref 'CostcentreTag'
+        - Key: environment
+          Value: !Ref 'EnvironmentTag'
+        - Key: owner
+          Value: !Ref 'OwnerTag'
+        - Key: project
+          Value: !Ref 'ProjectTag'
+        - Key: live
+          Value: !Ref LiveTag
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - !Sub 'codebuild.${AWS::URLSuffix}'
+      Policies:
+        - PolicyName: CodeBuildDefaultAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: CodeBuildAccess
+                Effect: Allow
+                Resource:
+                  - "*"
+                Action:
+                  - codebuild:*
+              - Sid: CodeBuildDeny
+                Action:
+                  - codebuild:Delete*
+                Effect: Deny
+                Resource:
+                  - "*"
+              - Sid: Ec2BasicReads
+                Effect: Allow
+                Resource:
+                  - '*'
+                Action:
+                  - ec2:DescribeAvailabilityZones
+                  - ec2:DescribeRegion*
+              - Sid: CloudFormationActions
+                Effect: Allow
+                Resource: '*'
+                Action:
+                  - cloudformation:Describe*
+                  - cloudformation:Get*
+                  - cloudformation:Validate*
+
+        - PolicyName: CodeArtifactAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: CodeArtifactAccess
+                Effect: Allow
+                Resource:
+                  - "*"
+                Action:
+                  - "codeartifact:DescribePackageVersion"
+                  - "codeartifact:DescribeRepository"
+                  - "codeartifact:GetPackageVersionReadme"
+                  - "codeartifact:GetRepositoryEndpoint"
+                  - "codeartifact:ListPackageVersionAssets"
+                  - "codeartifact:ListPackageVersionDependencies"
+                  - "codeartifact:ListPackageVersions"
+                  - "codeartifact:ListPackages"
+                  - "codeartifact:ReadFromRepository"
+                  - "sts:GetServiceBearerToken"
+              - Sid: CodeartfiactAuth
+                Action:
+                  - codeartifact:GetAuthorizationToken
+                Effect: Allow
+                Resource:
+                  - "*"
+        - PolicyName: ECRAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: ECRLoginAccess
+                Effect: Allow
+                Resource:
+                  - '*'
+                Action:
+                  - ecr:GetAuthorizationToken
+              - Sid: RWToECR
+                Effect: Allow
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/*'
+                Action: [
+                    "ecr:PutImageTagMutability",
+                    "ecr:ListTagsForResource",
+                    "ecr:UploadLayerPart",
+                    "ecr:BatchDeleteImage",
+                    "ecr:ListImages",
+                    "ecr:CompleteLayerUpload",
+                    "ecr:TagResource",
+                    "ecr:DescribeRepositories",
+                    "ecr:BatchCheckLayerAvailability",
+                    "ecr:GetDownloadUrlForLayer",
+                    "ecr:PutImage",
+                    "ecr:UntagResource",
+                    "ecr:BatchGetImage",
+                    "ecr:DescribeImages",
+                    "ecr:InitiateLayerUpload",
+                  ]
+              - Sid: PullFromAnyECR
+                Effect: Allow
+                Resource:
+                  - "*"
+                Action: [
+                    "ecr:ListTagsForResource",
+                    "ecr:ListImages",
+                    "ecr:DescribeRepositories",
+                    "ecr:BatchCheckLayerAvailability",
+                    "ecr:DescribeImageScanFindings",
+                    "ecr:GetDownloadUrlForLayer",
+                    "ecr:BatchGetImage",
+                    "ecr:DescribeImages",
+                    "ecr:GetRepositoryPolicy"
+                ]
+                Condition:
+                  Bool:
+                    aws:SecureTransport: true
+        - PolicyName: AssumeReadonlyRoles
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: "AllowAssumeRoleToReadonlyRole"
+                Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource:
+                  - !ImportValue 'CICD::prod::ReadOnly::Role::Arn'
+                  - !ImportValue 'CICD::nonprod::ReadOnly::Role::Arn'
+                Condition:
+                  Bool:
+                    aws:SecureTransport: true
+
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - !Sub 'codepipeline.${AWS::URLSuffix}'
+            Condition:
+              Bool:
+                aws:SecureTransport: true
+      Policies:
+        - PolicyName: CrossAccountAssume
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource:
+                  - !ImportValue 'CICD::prod::Pipeline::Role::Arn'
+                  - !ImportValue 'CICD::nonprod::Pipeline::Role::Arn'
+                Condition:
+                  Bool:
+                    aws:SecureTransport: true
+        - PolicyName: CodeBuildAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: CodeBuildAccess
+                Effect: Allow
+                Resource:
+                  - "*"
+                Action:
+                  - codebuild:*
+              - Sid: CodeBuildDeny
+                Action:
+                  - codebuild:Delete*
+                Effect: Deny
+                Resource:
+                  - "*"
+
+        - PolicyName: SNSPublish
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource:
+                  - !Ref PipelineNotifications
+      Tags:
+        - Key: costcentre
+          Value: !Ref 'CostcentreTag'
+        - Key: environment
+          Value: !Ref 'EnvironmentTag'
+        - Key: owner
+          Value: !Ref 'OwnerTag'
+        - Key: project
+          Value: !Ref 'ProjectTag'
+        - Key: live
+          Value: !Ref LiveTag
+
+
+  PipelineNotifications:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub '${AWS::StackName}PipelineTopic'
+      Subscription:
+        - Endpoint: !Ref ProductionContactEmail
+          Protocol: email
+      Tags:
+        - Key: costcentre
+          Value: !Ref 'CostcentreTag'
+        - Key: environment
+          Value: !Ref 'EnvironmentTag'
+        - Key: owner
+          Value: !Ref 'OwnerTag'
+        - Key: project
+          Value: !Ref 'ProjectTag'
+        - Key: live
+          Value: !Ref LiveTag
+
+  TopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Id: CodeStarAccess
+        Version: 2012-10-17
+        Statement:
+          - Sid: __default_statement_ID
+            Effect: Allow
+            Action:
+              - "SNS:GetTopicAttributes"
+              - "SNS:SetTopicAttributes"
+              - "SNS:AddPermission"
+              - "SNS:RemovePermission"
+              - "SNS:DeleteTopic"
+              - "SNS:Subscribe"
+              - "SNS:ListSubscriptionsByTopic"
+              - "SNS:Publish"
+              - "SNS:Receive"
+            Resource: !Ref PipelineNotifications
+            Principal:
+              AWS: "*"
+            Condition:
+              StringEquals:
+                AWS:SourceOwner: !Ref "AWS::AccountId"
+          - Sid: AccessForCodeStarNotifications
+            Effect: Allow
+            Action:
+              - SNS:Publish
+            Principal:
+              Service:
+                !Sub 'codestar-notifications.${AWS::URLSuffix}'
+            Resource: !Ref PipelineNotifications
+      Topics:
+        - !Ref PipelineNotifications
+
+  PipelineStatusNotify:
+    Type: AWS::CodeStarNotifications::NotificationRule
+    Properties:
+      DetailType: FULL
+      EventTypeIds:
+        - codepipeline-pipeline-stage-execution-succeeded
+        - codepipeline-pipeline-stage-execution-failed
+        - codepipeline-pipeline-pipeline-execution-failed
+        - codepipeline-pipeline-pipeline-execution-succeeded
+        - codepipeline-pipeline-manual-approval-needed
+      Name: !Ref AWS::StackName
+      Resource: !Sub 'arn:${AWS::Partition}:codepipeline:${AWS::Region}:${AWS::AccountId}:${ReleasePipeline}'
+      Status: ENABLED
+      Tags:
+        environment: !Ref EnvironmentTag
+        costcentre: !Ref CostcentreTag
+      Targets:
+        - TargetType: SNS
+          TargetAddress: !Ref PipelineNotifications
+
+  ApplicationBuild:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub 'Build-${DeploymentName}'
+      EncryptionKey: !ImportValue "CICD::mgmt::KMS::Key::Arn"
+      Artifacts:
+        Type: CODEPIPELINE
+      ServiceRole: !GetAtt 'CodeBuildRole.Arn'
+      Description: !Sub 'Executes build for ${DeploymentName}'
+      Environment:
+        ComputeType: !FindInMap [ "CodeBuild", "EnvironmentSize", !Ref BuildComputeConfiguration ]
+        Image: !Ref Environment
+        Type: LINUX_CONTAINER
+        PrivilegedMode: True
+        EnvironmentVariables:
+          - Name: CFN_TPL_BUCKET
+            Type: PLAINTEXT
+            Value: !ImportValue "CICD::mgmt::Bucket::CfnTemplates::Name"
+          - Name: AWS_ACCOUNT_ID
+            Type: PLAINTEXT
+            Value: !Ref 'AWS::AccountId'
+          - Name: COSTCENTRE_TAG
+            Value: !Ref CostcentreTag
+            Type: PLAINTEXT
+          - Name: LIVE_TAG
+            Type: PLAINTEXT
+            Value: !Ref LiveTag
+          - Name: OWNER_TAG
+            Type: PLAINTEXT
+            Value: !Ref OwnerTag
+          - Name: PROJECT_TAG
+            Type: PLAINTEXT
+            Value: !Ref ProjectTag
+          - Name: PROD_RO_ROLE_ARN
+            Type: PLAINTEXT
+            Value: !ImportValue 'CICD::prod::ReadOnly::Role::Arn'
+          - Name: NONPROD_RO_ROLE_ARN
+            Value: !ImportValue 'CICD::nonprod::ReadOnly::Role::Arn'
+            Type: PLAINTEXT
+          - Name: DEPLOYMENT_NAME
+            Value: !Ref DeploymentName
+            Type: PLAINTEXT
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: cicd/buildspec.yml
+      Tags:
+        - Key: costcentre
+          Value: !Ref 'CostcentreTag'
+        - Key: environment
+          Value: !Ref 'EnvironmentTag'
+        - Key: owner
+          Value: !Ref 'OwnerTag'
+        - Key: project
+          Value: !Ref 'ProjectTag'
+        - Key: live
+          Value: !Ref LiveTag
+
+  ReleasePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    DependsOn:
+      - S3BucketsReadAccess
+      - KmsKeyAccessPolicy
+      - CodePipelineRole
+      - CodeBuildRole
+      - ApplicationBuild
+    Properties:
+      Tags:
+        - Key: costcentre
+          Value: !Ref 'CostcentreTag'
+        - Key: environment
+          Value: !Ref 'EnvironmentTag'
+        - Key: owner
+          Value: !Ref 'OwnerTag'
+        - Key: project
+          Value: !Ref 'ProjectTag'
+        - Key: live
+          Value: !Ref LiveTag
+      ArtifactStore:
+        Location: !ImportValue "CICD::mgmt::Bucket::Artifacts::Name"
+        EncryptionKey:
+          Id: !ImportValue "CICD::mgmt::KMS::Key::Arn"
+          Type: KMS
+        Type: S3
+      RestartExecutionOnUpdate: false
+      RoleArn: !GetAtt 'CodePipelineRole.Arn'
+      Stages:
+        - Name: PipelineSource
+          Actions:
+            - Name: ApplicationSourceCode
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: '1'
+              Configuration:
+                Branch: !Ref BranchName
+                Owner: !Ref GithubOrganization
+                PollForSourceChanges: false
+                Repo: !Ref ApplicationRepositoryName
+                OAuthToken: !Sub '{{resolve:secretsmanager:${GithubToken}}}'
+              OutputArtifacts:
+                - Name: AppSourceCode
+              RunOrder: '1'
+        - Name: !Sub 'ApplicationBuildArtifact'
+          Actions:
+            - Name: ApplicationBuild
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref ApplicationBuild
+              InputArtifacts:
+                - Name: AppSourceCode
+              OutputArtifacts:
+                - Name: AppDefinition
+              RunOrder: '1'
+        - Name: !Sub 'DeployToDev'
+          Actions:
+            - Name: IdentifyDevChanges
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              Configuration:
+                ActionMode: CHANGE_SET_REPLACE
+                ChangeSetName: !Sub '${DeploymentName}'
+                RoleArn: !ImportValue 'CICD::nonprod::Cfn::Role::Arn'
+                StackName: !Sub '${DeploymentName}-dev'
+                TemplatePath: !Sub 'AppDefinition::dev/${DeploymentName}.yaml'
+                Capabilities: 'CAPABILITY_AUTO_EXPAND,CAPABILITY_IAM'
+              InputArtifacts:
+                - Name: AppDefinition
+              RunOrder: '1'
+              RoleArn: !ImportValue 'CICD::nonprod::Pipeline::Role::Arn'
+            - Name: RequestApproval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: '1'
+              Configuration:
+                NotificationArn: !Ref 'PipelineNotifications'
+              RunOrder: '2'
+            - Name: DeployToDev
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              Configuration:
+                ActionMode: CHANGE_SET_EXECUTE
+                ChangeSetName: !Sub '${DeploymentName}'
+                RoleArn: !ImportValue 'CICD::nonprod::Cfn::Role::Arn'
+                StackName: !Sub '${DeploymentName}-dev'
+                Capabilities: 'CAPABILITY_AUTO_EXPAND,CAPABILITY_IAM'
+              OutputArtifacts:
+                - Name: DevStackOutput
+              RunOrder: '3'
+              RoleArn: !ImportValue 'CICD::nonprod::Pipeline::Role::Arn'
+
+#        - Name: !Sub 'DeployToStg'
+#          Actions:
+#            - Name: IdentifyStgChanges
+#              ActionTypeId:
+#                Category: Deploy
+#                Owner: AWS
+#                Provider: CloudFormation
+#                Version: '1'
+#              Configuration:
+#                ActionMode: CHANGE_SET_REPLACE
+#                ChangeSetName: !Sub '${DeploymentName}'
+#                RoleArn: !ImportValue 'CICD::nonprod::Cfn::Role::Arn'
+#                StackName: !Sub '${DeploymentName}-stg'
+#                TemplatePath: !Sub 'AppDefinition::stg/${DeploymentName}.yaml'
+#                Capabilities: 'CAPABILITY_AUTO_EXPAND,CAPABILITY_IAM'
+#              InputArtifacts:
+#                - Name: AppDefinition
+#              RunOrder: '1'
+#              RoleArn: !ImportValue 'CICD::nonprod::Pipeline::Role::Arn'
+#            - Name: RequestApproval
+#              ActionTypeId:
+#                Category: Approval
+#                Owner: AWS
+#                Provider: Manual
+#                Version: '1'
+#              Configuration:
+#                NotificationArn: !Ref 'PipelineNotifications'
+#              RunOrder: '2'
+#            - Name: DeployToStg
+#              ActionTypeId:
+#                Category: Deploy
+#                Owner: AWS
+#                Provider: CloudFormation
+#                Version: '1'
+#              Configuration:
+#                ActionMode: CHANGE_SET_EXECUTE
+#                ChangeSetName: !Sub '${DeploymentName}'
+#                RoleArn: !ImportValue 'CICD::nonprod::Cfn::Role::Arn'
+#                StackName: !Sub '${DeploymentName}-stg'
+#                Capabilities: 'CAPABILITY_AUTO_EXPAND,CAPABILITY_IAM'
+#              OutputArtifacts:
+#                - Name: StagingStackOutput
+#              RunOrder: '3'
+#              RoleArn: !ImportValue 'CICD::nonprod::Pipeline::Role::Arn'
+#        - Fn::If:
+#            - DeployToProdCondition
+#            - Name: !Sub 'DeployToProduction'
+#              Actions:
+#                - Name: IdentifyChanges
+#                  ActionTypeId:
+#                    Category: Deploy
+#                    Owner: AWS
+#                    Provider: CloudFormation
+#                    Version: '1'
+#                  Configuration:
+#                    ActionMode: CHANGE_SET_REPLACE
+#                    ChangeSetName: !Sub '${DeploymentName}'
+#                    RoleArn: !ImportValue 'CICD::prod::Cfn::Role::Arn'
+#                    StackName: !Sub '${DeploymentName}-prod'
+#                    TemplatePath: !Sub 'AppDefinition::prod/${DeploymentName}.yaml'
+#                    Capabilities: 'CAPABILITY_AUTO_EXPAND,CAPABILITY_IAM'
+#                  InputArtifacts:
+#                    - Name: AppDefinition
+#                  RunOrder: '1'
+#                  RoleArn: !ImportValue 'CICD::prod::Pipeline::Role::Arn'
+#                - Name: RequestApproval
+#                  ActionTypeId:
+#                    Category: Approval
+#                    Owner: AWS
+#                    Provider: Manual
+#                    Version: '1'
+#                  Configuration:
+#                    NotificationArn: !Ref 'PipelineNotifications'
+#                  RunOrder: '2'
+#                - Name: DeployToProd
+#                  ActionTypeId:
+#                    Category: Deploy
+#                    Owner: AWS
+#                    Provider: CloudFormation
+#                    Version: '1'
+#                  Configuration:
+#                    ActionMode: CHANGE_SET_EXECUTE
+#                    ChangeSetName: !Sub '${DeploymentName}'
+#                    RoleArn: !ImportValue 'CICD::prod::Cfn::Role::Arn'
+#                    StackName: !Sub '${DeploymentName}-prod'
+#                    Capabilities: 'CAPABILITY_AUTO_EXPAND,CAPABILITY_IAM'
+#                  OutputArtifacts:
+#                    - Name: ProdStackOutput
+#                  RunOrder: '3'
+#                  RoleArn: !ImportValue 'CICD::prod::Pipeline::Role::Arn'
+#            - !Ref "AWS::NoValue"
+
+  WebHookApplicationRepository:
+    Type: AWS::CodePipeline::Webhook
+    Properties:
+      Authentication: GITHUB_HMAC
+      AuthenticationConfiguration:
+        SecretToken: !Sub '{{resolve:secretsmanager:${GithubToken}}}'
+      Filters:
+        - JsonPath: "$.ref"
+          MatchEquals: "refs/heads/{Branch}"
+      Name: !Sub 'gh-webhook-${AWS::Region}.${ApplicationRepositoryName}-${DeploymentName}'
+      RegisterWithThirdParty: True
+      TargetAction: ApplicationSourceCode
+      TargetPipeline: !Ref ReleasePipeline
+      TargetPipelineVersion: !GetAtt 'ReleasePipeline.Version'
