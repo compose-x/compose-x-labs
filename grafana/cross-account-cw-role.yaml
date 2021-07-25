@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Template to create cross account read-only roles for Central reporting
+Parameters:
+  NonProdAccountId:
+    Type: String
+    AllowedPattern: "[0-9]{12}"
+    Default: 000000000000
+
+  ProdAccountId:
+    Type: String
+    AllowedPattern: "[0-9]{12}"
+    Default: 000000000000
+
+  PermissionsBoundary:
+    Type: String
+    Default: none
+
+Conditions:
+  UsePermissionsBoundary: !Not [!Equals [!Ref PermissionsBoundary, "none"]]
+
+Resources:
+  CWIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: cw-readonly
+      Path: /grafana-monitoring/
+      PermissionsBoundary: !If
+        - UsePermissionsBoundary
+        - !Ref PermissionsBoundary
+        - !Ref AWS::NoValue
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Condition:
+              Bool:
+                aws:SecureTransport: 'true'
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub "arn:${AWS::Partition}:iam::${NonProdAccountId}:root"
+                - !Sub "arn:${AWS::Partition}:iam::${ProdAccountId}:root"
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess

@@ -1,0 +1,190 @@
+---
+# Docker compose expansion for AWS deployment
+
+version: "3.8"
+
+services:
+  grafana:
+    secrets:
+      - azureclient
+    environment:
+      GF_DATABASE_TYPE: mysql
+      GF_EXTERNAL_IMAGE_PROVIDER_STORAGE_S3_REGION: "${AWS::Region}"
+      GF_EXTERNAL_IMAGE_PROVIDER_STORAGE_S3_PATH: "/images"
+      GF_AUTH_AZUREAD_ENABLED: "true"
+      GF_AUTH_AZUREAD_NAME: "grafana"
+      GF_AUTH_AZUREAD_SCOPES: "openid email profile"
+      GF_AUTH_AZUREAD_SCOPES_ALLOWED_DOMAINS: "compose-x.io ews-network.net"
+      GF_AUTH_AZUREAD_ROOT_URL: "https://grafana.prod.compose-x.io"
+      GF_SERVER_ROOT_URL: "https://grafana.prod.compose-x.io"
+      GF_SERVER_DOMAIN: "grafana.prod.compose-x.io"
+    networks:
+      - internal
+    x-scaling:
+      Range: 1-5
+    x-alarms:
+      Predefined:
+        HighRamUsageAndMaxScaledOut:
+          Topics:
+            - x-sns: alarms
+    x-iam:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess
+      Policies:
+        - PolicyName: CrossAccountAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: AccessManagementAccount
+                Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource:
+                  - Fn::Sub: "arn:${AWS::Partition}:iam::*:role/grafana-monitoring/cw-readonly"
+
+volumes:
+  grafana:
+    x-efs:
+      Properties:
+        LifecyclePolicies:
+        TransitionToIA: AFTER_14_DAYS
+      MacroParameters:
+        EnforceIamAuth: True
+
+secrets:
+  azureclient:
+    x-secrets:
+      Name: /azuread/ddbbcdaa-a07f-4b7a-a417-97e7cd2847f3 # Replace with your App ID
+      JsonKeys:
+        - SecretKey: APP_ID
+          VarName: GF_AUTH_AZUREAD_CLIENT_ID
+        - SecretKey: CLIENT_SECRET
+          VarName: GF_AUTH_AZUREAD_CLIENT_SECRET
+        - SecretKey: AUTH_URL
+          VarName: GF_AUTH_AZUREAD_AUTH_URL
+        - SecretKey: TOKEN_URL
+          VarName: GF_AUTH_AZUREAD_TOKEN_URL
+
+x-rds:
+  grafana-db:
+    Properties:
+      Engine: "aurora-mysql"
+      EngineVersion: "5.7"
+      BackupRetentionPeriod: 1
+      DatabaseName: grafana
+      StorageEncrypted: True
+    Services:
+      - name: grafana
+        access: RW
+        SecretsMappings:
+          Mappings:
+            host: GF_DATABASE_HOST
+            port: GF_DATABASE_PORT
+            username: GF_DATABASE_USER
+            password: GF_DATABASE_PASSWORD
+
+x-sns:
+  Topics:
+    alarms: {}
+
+
+x-s3:
+  data-bucket:
+    Properties:
+      AccessControl: BucketOwnerFullControl
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+    Services:
+      - name: grafana
+        access:
+          bucket: ListOnly
+          objects: RW
+    Settings:
+      EnvVars:
+        - GF_EXTERNAL_IMAGE_STORAGE_S3_BUCKET
+
+networks:
+  internal:
+    x-vpc: InternalSubnets
+
+
+x-cluster:
+  Use: ${ENV_NAME:-prod}
+
+x-vpc:
+  Lookup:
+    VpcId:
+      Tags:
+        - Name: vpc--prod
+    InternalSubnets :
+      Tags:
+        - vpc::usage: application
+        - vpc::internal: "true"
+        - vpc::primary: "false"
+    AppSubnets:
+      Tags:
+        - vpc::usage: application
+        - vpc::internal: "false"
+        - vpc::primary: "true"
+    PublicSubnets:
+      Tags:
+        - vpc::usage: public
+    StorageSubnets:
+      Tags:
+        - vpc::usage: storage
+
+x-dns:
+  PublicZone:
+    Name: prod.compose-x.io
+  Records:
+    - Properties:
+        Name: grafana.prod.compose-x.io
+        Type: A
+      Target: x-elbv2::grafanaALB
+
+x-acm:
+  grafana-certs: # Replace with your own domain
+    MacroParameters:
+      DomainNames:
+        - grafana.prod.compose-x.io
+        - monitoring.prod.compose-x.io
+
+x-elbv2:
+  grafanaALB:
+    Properties:
+      Scheme: internet-facing
+      Type: application
+    MacroParameters:
+      Ingress:
+        ExtSources:
+          - IPv4: 0.0.0.0/0
+            Name: ANY
+            Description: "ANY"
+    Listeners:
+      - Port: 80
+        Protocol: HTTP
+        DefaultActions:
+          - Redirect: HTTP_TO_HTTPS
+      - Port: 443
+        Protocol: HTTPS
+        Certificates:
+          - x-acm: grafana-certs
+        Targets:
+          - name: grafana:grafana
+            access: /
+            AuthenticateCognitoConfig:
+              OnUnauthenticatedRequest: authenticate
+              Scope: openid
+              SessionCookieName: grafana
+              SessionTimeout: 3600
+              UserPoolArn: arn:aws:cognito-idp:eu-west-1:000000000000:userpool/eu-west-1_RfWYi0eAa # Replace
+              UserPoolClientId: qrspbawftgzxcvjleimnuyokh # Replace
+              UserPoolDomain: auth.grafana.prod.compose-x.io # Replace with your own domain
+
+    Services:
+      - name: grafana:grafana
+        port: 3000
+        protocol: HTTP
+        healthcheck: 3000:HTTP:7:2:15:5:/api/health

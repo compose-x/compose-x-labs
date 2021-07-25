@@ -51,6 +51,7 @@ Initialize your AWS Account for ECS Compose-X (see `requisites`_)
    :caption: Usual Suspects
 
    apps/wordpress
+   apps/grafana
 
 .. toctree::
    :maxdepth: 1

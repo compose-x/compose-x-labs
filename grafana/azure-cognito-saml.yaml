@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Template to create a CognitoPool for the purpose of using it in pair with AzureAD via SAML
+Parameters:
+  CognitoDomainCertificateArn:
+    Type: String
+  CognitoAuthDomainName:
+    Type: String
+  AzureMetadataURL:
+    Type: String
+  AzureDomainAppId:
+    Type: String
+
+  CloudFrontDomainId:
+    Type: String
+    Default: none
+  Route53ZoneId:
+    Type: String
+    Default: none
+  UseNameAsEmailAttribute:
+    Type: String
+    Default: "False"
+    AllowedValues: ["False", "True"]
+
+Mappings:
+  Schemas:
+    Urls:
+      name: http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name
+      groups: http://schemas.microsoft.com/ws/2008/06/identity/claims/groups
+      email: http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress
+
+Conditions:
+  Route53Con: !Not [!Equals [!Ref Route53ZoneId, "none"]]
+  DomainRecordCon: !Not [!Equals [!Ref CloudFrontDomainId, "none"]]
+  CreateRecordCon: !And [ !Condition Route53Con, !Condition DomainRecordCon]
+  UseNameAsAttributeForNameCon: !Equals [ !Ref UseNameAsEmailAttribute, "True"]
+
+Resources:
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      Schema:
+        - Name: name
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+        - Name: groups
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+      UsernameAttributes:
+        - email
+      UserPoolName: !Ref "AWS::StackName"
+
+  UserPoolIdentityProvider:
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Properties:
+      ProviderName: !Sub "AzureAD"
+      UserPoolId: !Ref UserPool
+      AttributeMapping:
+        name: !FindInMap ["Schemas", "Urls", "name"]
+        email: !If
+          - UseNameAsAttributeForNameCon
+          - !FindInMap ["Schemas", "Urls", "name"]
+          - !FindInMap ["Schemas", "Urls", "email"]
+        groups: !FindInMap ["Schemas", "Urls", "groups"]
+
+      ProviderDetails:
+        MetadataURL: !Ref AzureMetadataURL
+      ProviderType: SAML
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      CustomDomainConfig:
+        CertificateArn: "CognitoDomainCertificateArn"
+      Domain: !Ref CognitoAuthDomainName
+      UserPoolId: !Ref UserPool
+
+
+
+  UserDomainDnsEntry:
+    Condition: CreateRecordCon
+    Type: 'AWS::Route53::RecordSetGroup'
+    Properties:
+      HostedZoneId: !Ref Route53ZoneId
+      RecordSets:
+        - Name: !Ref CognitoAuthDomainName
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !Ref CloudFrontDomainId
+
+
+Outputs:
+  PoolId:
+    Value: !Ref UserPool
+  PoolUrn:
+    Value: !Sub urn:amazon:cognito:sp:${UserPool}

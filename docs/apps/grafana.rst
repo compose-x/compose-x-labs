@@ -1,0 +1,2 @@
+
+.. include:: ../../grafana/README.rst
