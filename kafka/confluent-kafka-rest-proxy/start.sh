@@ -1,0 +1,8 @@
+#/bin/bash
+HOSTNAME=$(hostname)
+export KAFKA_REST_LISTENERS=http://${HOSTNAME}:8082
+export KAFKA_REST_HOST_NAME=${REST_HOSTNAME:-$HOSTNAME}
+echo Starting on $HOSTNAME
+echo REST LISTENERS $KAFKA_REST_LISTENERS
+echo REST HOSTNAME $KAFKA_REST_HOST_NAME
+/etc/confluent/docker/run

@@ -1,0 +1,25 @@
+---
+# Docker-compose file for kafka rest proxy service
+
+version: "3.8"
+services:
+  kafka-rest-proxy:
+    ports:
+      - 8082:8082
+    image: ${REGISTRY_URI}kafka-rest-proxy:${IMAGE_TAG:-6.2}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    deploy:
+      replicas: 2
+      resources:
+        reservations:
+          cpus: 0.5
+          memory: 1GB
+    x-scaling: # This allows us to define autoscaling rules by providing a min and max containers that we want to deploy
+      Range: 1-4
+    environment: # Below settings set for our rest proxy which are not sensitive information.
+      KAFKA_REST_CLIENT_SECURITY_PROTOCOL: SASL_SSL
+      KAFKA_REST_CLIENT_SASL_MECHANISM: PLAIN
+      KAFKA_REST_CLIENT_ENDPOINT_IDENTIFICATION_ALGORITHM: "https"
+      KAFKA_REST_CLIENT_BASIC_AUTH_CREDENTIALS_SOURCE: USER_INFO

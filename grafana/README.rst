@@ -33,8 +33,8 @@ So head to the `Azure AD OAuth2 authentication`_ on the Grafana docs.
 
 .. tip::
 
-To give all of the settings to Grafana, we create a secret in Secrets Manager that contains all of the settings
-grafana needs. To do so, use the `**azure-grafana-secrets.yaml**`_ template.
+    To give all of the settings to Grafana, we create a secret in Secrets Manager that contains all of the settings
+    grafana needs. To do so, use the `**azure-grafana-secrets.yaml**`_ template.
 
 Once you have your secret created, we pass that secret to Grafana and provide each "key" of the JSON secret as an individual
 environment variable

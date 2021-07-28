@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: |
+  Template to create a new AWS Secret storing credentials for a consumer group of a specific confluent kafka cluster
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Cluster Settings
+        Parameters:
+          - ClusterId
+          - BootstrapEndpoint
+          - BootstrapPort
+          - SchemaRegistryUrl
+      - Label:
+          default: Consumer group settings
+        Parameters:
+          - ConsumerGroupName
+          - ConsumerGroupUsername
+          - ConsumerGroupPassword
+      - Label:
+          default: Schema Registry credentials
+        Parameters:
+          - SchemaRegistryGroupUsername
+          - SchemaRegistryGroupPassword
+
+Parameters:
+  ClusterId:
+    Type: String
+  BootstrapEndpoint:
+    Type: String
+  BootstrapPort:
+    Type: Number
+    MinValue: 1024
+    MaxValue: 65535
+
+  ConsumerGroupName:
+    Type: String
+  ConsumerGroupUsername:
+    Type: String
+  ConsumerGroupPassword:
+    Type: String
+    NoEcho: True
+
+  SchemaRegistryUrl:
+    Type: String
+  SchemaRegistryGroupUsername:
+    Type: String
+  SchemaRegistryGroupPassword:
+    Type: String
+    NoEcho: True
+  LiveTag:
+    Type: String
+    AllowedValues:
+      - "yes"
+      - "no"
+    Default: "no"
+
+Resources:
+  KafkaSecret:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "kafka-${ConsumerGroupName}-${ClusterId}"
+      Name: !Sub '/kafka/${AWS::Region}/${ClusterId}/${ConsumerGroupName}'
+      Description: "Confluent Kafka Secret for application team"
+      SecretString: !Sub |
+        {
+          "SASL_USERNAME": "${ConsumerGroupUsername}",
+          "SASL_PASSWORD": "${ConsumerGroupPassword}",
+          "REGISTRY_USERNAME": "${SchemaRegistryGroupUsername}",
+          "REGISTRY_PASSWORD": "${SchemaRegistryGroupPassword}",
+          "BOOTSTRAP_ENDPOINT": "${BootstrapEndpoint}",
+          "BOOTSTRAP_PORT": ${BootstrapPort},
+          "BOOTSTRAP_SERVERS": "${BootstrapEndpoint}:${BootstrapPort}",
+          "SCHEMA_REGISTRY_URL": "${SchemaRegistryUrl}",
+          "SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO": "${SchemaRegistryGroupUsername}:${SchemaRegistryGroupPassword}",
+          "SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG": "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"${ConsumerGroupUsername}\" password=\"${ConsumerGroupPassword}\";"
+        }

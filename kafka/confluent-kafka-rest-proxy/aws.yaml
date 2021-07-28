@@ -1,0 +1,78 @@
+---
+# Docker compose override file for AWS dev environment
+
+version: "3.8"
+services:
+  kafka-rest-proxy:
+    secrets:
+      - KAFKA_CREDS
+
+secrets:
+  KAFKA_CREDS:
+    x-secrets:
+      Name: /kafka/eu-west-1/lkc-zzzzz/kafka-rest-proxy
+      JsonKeys: # This is where we get to expose sensitive information in an obfuscated way
+        - SecretKey: BOOTSTRAP_SERVERS
+          VarName: KAFKA_REST_BOOTSTRAP_SERVERS
+        - SecretKey: SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG
+          VarName: KAFKA_REST_CLIENT_SASL_JAAS_CONFIG
+        - SecretKey: SCHEMA_REGISTRY_URL
+          VarName: KAFKA_REST_SCHEMA_REGISTRY_URL
+        - SecretKey: SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
+          VarName: KAFKA_REST_SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
+
+# We define a NLB to use and indicate how to send traffic and heathcheck the target nodes.
+
+x-elbv2:
+  kafka-rest-proxy:
+    Properties:
+      Scheme: internal
+      Type: network
+    MacroParameters:
+      cross_zone: True
+    Listeners:
+      - Port: 8082
+        Protocol: TCP
+        Targets:
+          - name: kafka-rest-proxy:kafka-rest-proxy
+            access: /
+    Services:
+      - name: kafka-rest-proxy:kafka-rest-proxy
+        port: 8082
+        healthcheck: 8082:TCP:7:7:15:5
+        protocol: TCP
+
+
+x-cluster:
+  Use: ${ENV_NAME:-prod}
+
+# We already have a VPC with the subnets we need, so we indentify these instead of re-creating a VPC.
+
+x-vpc:
+  Lookup:
+    VpcId:
+      Tags:
+        - Name: vpc-prod
+        - EnvironmentName: vpc-prod
+        - environment: production
+    AppSubnets:
+      Tags:
+        - vpc::usage: application
+    PublicSubnets:
+      Tags:
+        - vpc::usage: public
+    StorageSubnets:
+      Tags:
+        - vpc::usage: storage
+    RoleArn: ${PROD_RO_ROLE_ARN}
+
+# We already have DNS Zones in our VPC and publicly, so we indentify and re-use these.
+x-dns:
+  PublicZone:
+    Name: prod.compose-x.io
+    Lookup:
+      RoleArn: ${PROD_RO_ROLE_ARN}
+  PrivateNamespace:
+    Name: prod.compose-x.internal
+    Lookup:
+      RoleArn: ${PROD_RO_ROLE_ARN}
