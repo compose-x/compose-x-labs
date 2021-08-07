@@ -43,6 +43,7 @@ services:
     - 443:443
     depends_on:
       - files-composer
+      - kafdrop
     x-ecr:
       InterpolateWithDigest: true
 
@@ -53,7 +54,7 @@ services:
     volumes:
     - kafdrop:/app:ro
     depends_on:
-      - nginx
+      - files-composer
     deploy:
       labels:
         ecs.task.family: kafdrop
