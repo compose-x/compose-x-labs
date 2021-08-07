@@ -1,0 +1,45 @@
+---
+# Kafka Topics/ACLs/Schemas definitions for kafdrop
+
+Globals:
+  BootstrapServers: none.internal
+
+ACLs:
+  Policies:
+    # Groups access
+    - Resource: *
+      ResourceType: GROUP
+      Action: DESCRIBE
+      Effect: ALLOW
+      Principal: User:kafdrop
+      PatternType: PREFIXED
+
+    # Topics access
+    - Resource: *
+      ResourceType: TOPIC
+      Action: READ
+      Effect: ALLOW
+      Principal: User:kafdrop
+      PatternType: PREFIXED
+
+    - Resource: *
+      ResourceType: TOPIC
+      Action: DESCRIBE_CONFIGS
+      Effect: ALLOW
+      Principal: User:kafdrop
+      PatternType: PREFIXED
+
+    # Cluster wide settings
+    - Resource: kafka-cluster
+      ResourceType: CLUSTER
+      Action: DESCRIBE
+      Effect: ALLOW
+      Principal: User:kafdrop
+      PatternType: LITERAL
+
+    - Resource: kafka-cluster
+      ResourceType: CLUSTER
+      Action: DESCRIBE_CONFIGS
+      Effect: ALLOW
+      Principal: User:kafdrop
+      PatternType: LITERAL

@@ -59,6 +59,7 @@ Initialize your AWS Account for ECS Compose-X (see `requisites`_)
 
    kafka/connect
    kafka/restproxy
+   kafka/kafdrop
 
 Indices and tables
 ==================
