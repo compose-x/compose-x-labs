@@ -80,7 +80,7 @@ autosummary_generate = True
 autoclass_content = "class"
 
 sitemap_locales = ["en"]
-html_baseurl = "https://compose-x.io/"
+html_baseurl = "https://labs.compose-x.io/"
 
 extensions.append("sphinx_material")
 html_theme_path = sphinx_material.html_theme_path()
@@ -97,7 +97,7 @@ html_theme_options = {
     # 'google_analytics_account': 'UA-XXXXX',
     # Specify a base_url used to generate sitemap.xml. If not
     # specified, then no sitemap will be built.
-    "base_url": "https://compose-x.io/",
+    "base_url": "https://labs.compose-x.io/",
     "html_minify": False,
     "html_prettify": True,
     "css_minify": True,
