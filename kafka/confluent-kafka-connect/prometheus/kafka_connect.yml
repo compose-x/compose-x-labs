@@ -73,7 +73,7 @@ rules:
     labels:
       connector: $1
       $2: $3
-    type: UNTYPED
+    type: GAUGE
   # kafka.connect:type=*-task-metrics,*
   # kafka.connect:type=source-task-metrics,connector=*,task=*
   # kafka.connect:type=sink-task-metrics,connector=*,task=*
@@ -83,6 +83,7 @@ rules:
     labels:
       connector: "$2"
       task: "$3"
+    type: GAUGE
   # kafka.connect:type=task-error-metrics,*
   # kafka.connect:type=task-error-metrics,connector=*,task=*
   - pattern: "kafka.connect<type=task-error-metrics, connector=(.+), task=(\\d+)><>([^:]+)"
@@ -90,6 +91,7 @@ rules:
     labels:
       connector: "$1"
       task: "$2"
+    type: GAUGE
   # confluent.replicator:type=confluent-replicator-task-metrics,* : confluent-replicator-task-topic-partition-*: Number Values
   - pattern: "confluent.replicator<type=confluent-replicator-task-metrics, confluent-replicator-(.*)=(.+), confluent-replicator-(.+)=(.+), confluent-replicator-(.+)=(.+), confluent-replicator-(.+)=(.+)><>confluent-replicator-task-topic-partition-(.*): (.*)"
     name: confluent_replicator_task_metrics_$9
