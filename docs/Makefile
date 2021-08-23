@@ -4,7 +4,7 @@
 # You can set these variables from the command line.
 SPHINXOPTS    =
 SPHINXBUILD   = python -msphinx
-SPHINXPROJ    = ecr_scan_reporter
+SPHINXPROJ    = compose-x-labs
 SOURCEDIR     = .
 BUILDDIR      = _build
 

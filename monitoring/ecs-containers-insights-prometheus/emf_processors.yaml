@@ -1,0 +1,18 @@
+EmfProcessors:
+  - source_labels:
+      - container_name
+    label_matcher: "^connect$" # I match the container named connect
+    dimensions:
+      - [ "ClusterName", "TaskDefinitionFamily", "connector", "task" ]
+    metric_selectors:
+      - "^kafka_connect_connector_task_metrics_batch_size_avg$"
+      - "^kafka_connect_connector_task_metrics_batch_size_max$"
+      - "^kafka_connect_sink_task_metrics_offset_commit_completion_rate$"
+      - "^kafka_connect_sink_task_metrics_offset_commit_completion_total$"
+  - source_labels:
+      - container_name
+    label_matcher: "^connect$"
+    dimensions:
+      - [ "ClusterName", "TaskDefinitionFamily", "connector" ]
+    metric_selectors:
+      - "^kafka_connect_connect_worker_metrics_connector_(?:total|failed|unassigned|paused|running)_task_count$"

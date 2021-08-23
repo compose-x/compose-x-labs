@@ -353,7 +353,7 @@ defining that our service is **kafdrop:nginx**
 
 .. seealso::
 
-    The full configuration with support for cognito is available `here <https://github.com/compose-x/compose-x-labs/tree/main/kafka/kafdrop/envs/prod.yaml>`__
+    The full configuration with support for cognito is available `here <https://github.com/compose-x/compose-x-labs/tree/main/kafka/kafdrop/envs/aws.yaml>`__
 
 
 Deploy to AWS

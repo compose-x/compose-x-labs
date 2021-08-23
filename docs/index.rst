@@ -61,6 +61,14 @@ Initialize your AWS Account for ECS Compose-X (see `requisites`_)
    kafka/restproxy
    kafka/kafdrop
 
+.. toctree::
+    :caption: Monitoring
+    :maxdepth: 1
+
+    monitoring/ecs-containers-insights-prometheus
+
+
+
 Indices and tables
 ==================
 * :ref:`genindex`
