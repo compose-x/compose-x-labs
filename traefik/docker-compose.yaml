@@ -1,0 +1,36 @@
+---
+# Base docker-compose file
+
+version: "3.8"
+services:
+  traefik:
+    image: "traefik:v2.5"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    deploy:
+      resources:
+        limits:
+          cpus: 0.2
+          memory: 128MB
+        reservations:
+          cpus: 0.1
+          memory: 64MB
+
+  whoami:
+    expose:
+      - 80
+    image: "traefik/whoami"
+    container_name: "simple-service"
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.whoami.rule: Host(`traefik.compose-x.io`)
+      traefik.http.routers.whoami.entrypoints: web
+    deploy:
+      resources:
+        limits:
+          cpus: 0.4
+          memory: 64MB
+        reservations:
+          cpus: 0.2
+          memory: 64MB

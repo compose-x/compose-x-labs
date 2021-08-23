@@ -1,0 +1,109 @@
+---
+# Docker compose with overrides and config to run in AWS ECS
+
+version: "3.8"
+services:
+  traefik:
+    command:
+      #- "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.ecs.autoDiscoverClusters=true"
+      - "--providers.ecs.clusters=${CLUSTER_NAME}"
+      - "--entrypoints.web.address=:80"
+    x-iam:
+      Policies:
+        - PolicyName: TraefikRecommended
+          PolicyDocument: {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "TraefikECSReadAccess",
+                "Effect": "Allow",
+                "Action": [
+                    "ecs:ListClusters",
+                    "ecs:DescribeClusters",
+                    "ecs:ListTasks",
+                    "ecs:DescribeTasks",
+                    "ecs:DescribeContainerInstances",
+                    "ecs:DescribeTaskDefinition",
+                    "ec2:DescribeInstances"
+                ],
+                "Resource": [
+                    "*"
+                ]
+              }
+            ]
+          }
+    x-network:
+      UseCloudmap: true
+      Ingress:
+        ExtSources:
+          - IPv4: 0.0.0.0/0
+            Name: ANY
+            Description: ANY
+
+
+  whoami:
+    ports:
+      - protocol: tcp
+        target: 80
+    deploy:
+      labels:
+        ecs.task.family: whoami
+    x-network:
+      UseCloudmap: true
+      Ingress:
+        Services:
+          - Name: traefik
+    depends_on:
+      - traefik
+
+x-cluster:
+  Properties:
+    CapacityProviders:
+      - FARGATE_SPOT
+      - FARGATE
+    ClusterName: ${CLUSTER_NAME}
+    ClusterSettings:
+      - Name: containerInsights
+        Value: enabled
+    DefaultCapacityProviderStrategy:
+      - Base: 2
+        Weight: 2
+        CapacityProvider: FARGATE_SPOT
+      - Weight: 1
+        CapacityProvider: FARGATE
+
+#  Lookup:
+#    ClusterName: ${CLUSTER_NAME}
+
+x-dns:
+  PublicZone:
+    Name: compose-x.io
+    Lookup: compose-x.io
+  PrivateNamespace:
+    Name: compose-x.internal
+  Records:
+    - Properties:
+        Name: traefik.compose-x.io
+        Type: A
+      Target: x-elbv2::public-ingress
+
+x-elbv2:
+  public-ingress:
+    Properties:
+      Scheme: internet-facing
+      Type: network
+    MacroParameters:
+      cross_zone: true
+    Listeners:
+      - Port: 80
+        Protocol: TCP
+        Targets:
+          - name: traefik:traefik
+            access: /
+    Services:
+      - name: traefik:traefik
+        port: 80
+        protocol: TCP
+        healthcheck: 80:TCP:7:2:15:5
