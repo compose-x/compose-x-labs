@@ -4,12 +4,18 @@
 version: "3.8"
 services:
   traefik:
+    labels:
+      container_name: traefik
     command:
       #- "--log.level=DEBUG"
       - "--api.insecure=true"
       - "--providers.ecs.autoDiscoverClusters=true"
       - "--providers.ecs.clusters=${CLUSTER_NAME}"
       - "--entrypoints.web.address=:80"
+      - "--metrics"
+      - '--metrics.prometheus=true'
+      - "--metrics.prometheus.addServicesLabels=true"
+      - "--metrics.prometheus.addrouterslabels=true"
     x-iam:
       Policies:
         - PolicyName: TraefikRecommended
@@ -41,8 +47,7 @@ services:
           - IPv4: 0.0.0.0/0
             Name: ANY
             Description: ANY
-
-
+        Myself: True
   whoami:
     ports:
       - protocol: tcp
