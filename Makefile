@@ -49,7 +49,6 @@ clean-test: ## remove test and coverage artifacts
 	rm -fr .pytest_cache
 
 docs: ## generate Sphinx HTML documentation, including API docs
-	rm -f docs/ecr_scan_reporter.rst
 	rm -f docs/modules.rst
 	sphinx-apidoc -o docs/ .
 	$(MAKE) -C docs clean
