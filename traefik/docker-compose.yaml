@@ -7,19 +7,16 @@ services:
     image: "traefik:v2.5"
     ports:
       - "80:80"
-      - "8080:8080"
+      - "8080:8080/tcp"
     deploy:
       resources:
-        limits:
-          cpus: 0.2
-          memory: 128MB
         reservations:
           cpus: 0.1
           memory: 64MB
 
   whoami:
     expose:
-      - 80
+      - 80/tcp
     image: "traefik/whoami"
     container_name: "simple-service"
     labels:
@@ -28,9 +25,6 @@ services:
       traefik.http.routers.whoami.entrypoints: web
     deploy:
       resources:
-        limits:
-          cpus: 0.4
-          memory: 64MB
         reservations:
           cpus: 0.2
-          memory: 64MB
+          memory: 128MB

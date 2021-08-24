@@ -4,6 +4,9 @@
 version: "3.8"
 services:
   traefik:
+    networks:
+      - traefik
+      - inbound
     image: "traefik:v2.5"
     container_name: "traefik"
     command:
@@ -12,16 +15,30 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
+      - "--metrics"
+      - '--metrics.prometheus=true'
+      - "--metrics.prometheus.addServicesLabels=true"
+      - "--metrics.prometheus.addrouterslabels=true"
+
     ports:
       - "80:80"
       - "8080:8080"
+      - 8082:8082
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
 
   whoami:
     image: "traefik/whoami"
     container_name: "simple-service"
+    networks:
+      - traefik
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.whoami.rule=Host(`localhost`)"
       - "traefik.http.routers.whoami.entrypoints=web"
+
+networks:
+  traefik:
+    name: traefik
+  inbound:
+    name: inbound

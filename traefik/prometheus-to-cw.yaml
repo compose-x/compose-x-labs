@@ -1,0 +1,33 @@
+---
+# Configuration to export the prometheus config from traefik to AWS CW
+
+version: "3.8"
+services:
+  traefik:
+    x-ecs:
+      CapacityProviderStrategy:
+        - CapacityProvider: FARGATE_SPOT
+          Base: 1
+          Weight: 4
+        - CapacityProvider: FARGATE
+          Base: 1
+          Weight: 1
+    x-prometheus:
+      ContainersInsights:
+        EnableCWAgentDebug: true
+        CustomRules:
+          - ExporterPort: 8080
+            ExporterPath: /metrics
+            EmfProcessors:
+              - source_labels:
+                  - container_name
+                label_matcher: "traefik.$"
+                metric_selectors:
+                  - "^traefik_entrypoint_requests_total$"
+                dimensions:
+                  - - ClusterName
+                    - TaskDefinitionFamily
+                    - code
+                    - entrypoint
+                    - method
+                    - protocol
