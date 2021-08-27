@@ -53,17 +53,23 @@ Initialize your AWS Account for ECS Compose-X (see `requisites`_)
     ecs-compose-x init # Will create a default directory, enable ECS Features.
 
 .. toctree::
-   :maxdepth: 1
-   :caption: Usual Suspects
+    :maxdepth: 1
+    :caption: Usual Suspects
 
-   apps/wordpress
-   apps/grafana
+    apps/grafana
+    apps/wordpress
 
 .. toctree::
     :caption: CICD in AWS
     :maxdepth: 1
 
     cicd/init_aws_accounts.rst
+
+.. toctree::
+    :caption: With service mesh
+    :maxdepth: 1
+
+    apps/traefik_ecs_part1.rst
 
 .. toctree::
     :caption: Monitoring

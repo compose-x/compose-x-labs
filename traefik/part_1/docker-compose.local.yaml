@@ -1,5 +1,5 @@
 ---
-# Base docker-compose file
+# Override config file for local testing and work
 
 version: "3.8"
 services:
@@ -32,9 +32,9 @@ services:
     networks:
       - traefik
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.whoami.rule=Host(`localhost`)"
-      - "traefik.http.routers.whoami.entrypoints=web"
+      traefik.enable: "true"
+      traefik.http.routers.whoami.rule: Host(`localhost`)
+      traefik.http.routers.whoami.entrypoints: web
 
 networks:
   traefik:

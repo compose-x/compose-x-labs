@@ -19,7 +19,7 @@ services:
       - "--metrics.prometheus.addServicesLabels=true"
       - "--metrics.prometheus.addrouterslabels=true"
       - "--entryPoints.web.address=:80"
-      - "--entryPoints.web.proxyProtocol.trustedIPs=100.64.0.0/10"
+      - "--entryPoints.web.proxyProtocol.trustedIPs=100.64.72.0/24"
     x-iam:
       Policies:
         - PolicyName: TraefikRecommended
@@ -52,6 +52,7 @@ services:
             Name: ANY
             Description: ANY
         Myself: True
+
   whoami:
     ports:
       - protocol: tcp
@@ -61,13 +62,13 @@ services:
         ecs.task.family: whoami
     labels:
       traefik.http.routers.whoami.rule: Host(`traefik.compose-x.io`) # Override for your real domain name for this service.
+    depends_on:
+      - traefik
     x-network:
       UseCloudmap: true
       Ingress:
         Services:
           - Name: traefik
-    depends_on:
-      - traefik
 
 x-cluster:
   Properties:
@@ -85,9 +86,6 @@ x-cluster:
       - Weight: 1
         CapacityProvider: FARGATE
 
-#  Lookup:
-#    ClusterName: ${CLUSTER_NAME}
-
 x-dns:
   PublicZone:
     Name: compose-x.io
@@ -100,6 +98,12 @@ x-dns:
         Type: A
       Target: x-elbv2::public-ingress
 
+x-acm:
+  traefik-composex:
+    Lookup:
+      Tags:
+        - Name: traefik.compose-x.io
+
 x-elbv2:
   public-ingress:
     Properties:
@@ -110,6 +114,13 @@ x-elbv2:
     Listeners:
       - Port: 80
         Protocol: TCP
+        Targets:
+          - name: traefik:traefik
+            access: /
+      - Port: 443
+        Protocol: TLS
+        Certificates:
+          - x-acm: traefik-composex
         Targets:
           - name: traefik:traefik
             access: /
@@ -125,6 +136,3 @@ x-elbv2:
             Value: "true"
           - Key: preserve_client_ip.enabled
             Value: "true"
-#          deregistration_delay.timeout_seconds: "30"
-#          proxy_protocol_v2.enabled: "true"
-#          preserve_client_ip.enabled: "true"

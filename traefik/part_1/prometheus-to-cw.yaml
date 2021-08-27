@@ -6,14 +6,6 @@ services:
   traefik:
     labels:
       container_name: traefik
-    x-ecs:
-      CapacityProviderStrategy:
-        - CapacityProvider: FARGATE_SPOT
-          Base: 1
-          Weight: 4
-        - CapacityProvider: FARGATE
-          Base: 1
-          Weight: 1
     x-prometheus:
       ContainersInsights:
         EnableCWAgentDebug: true
