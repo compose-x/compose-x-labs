@@ -18,6 +18,12 @@ Applications
 * ECR Scan Reporter (`Source <https://github.com/compose-x/ecr-scan-reporter>`__ | `Docs <https://ecr-scan-reporter.compose-x.io>`__ | `AWS SAR <https://serverlessrepo.aws.amazon.com/applications/eu-west-1/518078317392/ecr-scan-reporter>`__)
 
 
+Technical Resources
+=====================
+
+* CodePipeline Orchestra (`Source <https://github.com/compose-x/codepipline-orchestra>`__)
+    *Repository with tools to help with using AWS CodePipeline and AWS CodeBuild for CICD in AWS.*
+
 Pre-requisites
 ===============
 
@@ -29,16 +35,16 @@ Use ECS Compose-X as CLI
 
 .. code-block:: console
 
-    # Install for you user
-    python3 -m pip install ecs-composex --user
-
-    # Install in a virtual environment
+    # Install in a virtual environment # Recommended
     python3 -m venv venv
     source venv/bin/activate
     python3 -m pip install ecs-composex
 
+    # Install for you user
+    python3 -m pip install ecs-composex --user
+
     # With docker
-    docker run --rm -e AWS_PROFILE=$AWS_PROFILE -v $HOME/.aws/:/root/.aws public.ecr.aws/compose-x/compose-x
+    docker run --rm -e AWS_PROFILE=${AWS_PROFILE:-default} -v $HOME/.aws/:/root/.aws -v $PWD:/tmp public.ecr.aws/compose-x/compose-x
 
 Initialize your AWS Account for ECS Compose-X (see `requisites`_)
 
@@ -54,12 +60,10 @@ Initialize your AWS Account for ECS Compose-X (see `requisites`_)
    apps/grafana
 
 .. toctree::
-   :maxdepth: 1
-   :caption: Kafka
+    :caption: CICD in AWS
+    :maxdepth: 1
 
-   kafka/connect
-   kafka/restproxy
-   kafka/kafdrop
+    cicd/init_aws_accounts.rst
 
 .. toctree::
     :caption: Monitoring
@@ -67,7 +71,13 @@ Initialize your AWS Account for ECS Compose-X (see `requisites`_)
 
     monitoring/ecs-containers-insights-prometheus
 
+.. toctree::
+   :maxdepth: 1
+   :caption: Kafka
 
+   kafka/connect
+   kafka/restproxy
+   kafka/kafdrop
 
 Indices and tables
 ==================

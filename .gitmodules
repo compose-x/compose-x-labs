@@ -1,3 +1,6 @@
 [submodule "wordpress-bitnami"]
 	path = wordpress-bitnami
 	url = https://github.com/compose-x/wordpress-demo.git
+[submodule "codepipline-orchestra"]
+	path = codepipline-orchestra
+	url = https://github.com/compose-x/codepipline-orchestra
