@@ -7,7 +7,6 @@ services:
     image: "traefik:v2.5"
     ports:
       - "80:80"
-      - "8080:8080/tcp"
     deploy:
       resources:
         reservations:
@@ -21,7 +20,7 @@ services:
     container_name: "simple-service"
     labels:
       traefik.enable: "true"
-      traefik.http.routers.whoami.rule: Host(`traefik.compose-x.io`)
+      traefik.http.routers.whoami.rule: Host(`localhost`)
       traefik.http.routers.whoami.entrypoints: web
     deploy:
       resources:
