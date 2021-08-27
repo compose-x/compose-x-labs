@@ -4,6 +4,8 @@
 version: "3.8"
 services:
   traefik:
+    labels:
+      container_name: traefik
     x-ecs:
       CapacityProviderStrategy:
         - CapacityProvider: FARGATE_SPOT
@@ -21,7 +23,7 @@ services:
             EmfProcessors:
               - source_labels:
                   - container_name
-                label_matcher: "traefik.$"
+                label_matcher: "^traefik.*$"
                 metric_selectors:
                   - "^traefik_entrypoint_requests_total$"
                 dimensions:

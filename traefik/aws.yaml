@@ -4,6 +4,8 @@
 version: "3.8"
 services:
   traefik:
+    expose:
+      - 8080/tcp
     labels:
       container_name: traefik
     command:
@@ -16,6 +18,8 @@ services:
       - '--metrics.prometheus=true'
       - "--metrics.prometheus.addServicesLabels=true"
       - "--metrics.prometheus.addrouterslabels=true"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.web.proxyProtocol.trustedIPs=100.64.0.0/10"
     x-iam:
       Policies:
         - PolicyName: TraefikRecommended
@@ -55,6 +59,8 @@ services:
     deploy:
       labels:
         ecs.task.family: whoami
+    labels:
+      traefik.http.routers.whoami.rule: Host(`traefik.compose-x.io`) # Override for your real domain name for this service.
     x-network:
       UseCloudmap: true
       Ingress:
@@ -112,3 +118,13 @@ x-elbv2:
         port: 80
         protocol: TCP
         healthcheck: 80:TCP:7:2:15:5
+        TargetGroupAttributes:
+          - Key: deregistration_delay.timeout_seconds
+            Value: "30"
+          - Key: proxy_protocol_v2.enabled
+            Value: "true"
+          - Key: preserve_client_ip.enabled
+            Value: "true"
+#          deregistration_delay.timeout_seconds: "30"
+#          proxy_protocol_v2.enabled: "true"
+#          preserve_client_ip.enabled: "true"
