@@ -8,42 +8,60 @@ TLDR; Traefik is easy to work with locally and in ECS, making it a great match f
 
 .. note::
 
-    To follow the following with `ECS Compose-X`_ make sure to use version 0.16.4 or above.
+    To follow the following with `ECS Compose-X`_ make sure to use version 0.16.5 or above.
 
-`Traefik`_ is a very lightweight and features-full that helps making, as per their slogan, **"networking boring"**.
+Introduction
+===============
 
-They have 4 different offers as per their marketing site, two of which open source so we are focusing on that today.
+Today we are not trying to solve any particular challenge. As a request coming from the `Slack Community Channel`_,
+someone is looking at deploying to AWS on ECS (with Fargate as compute layer) and have as little management overhead as
+possible. And `ECS Compose-X`_ can help with just that.
 
-* `Traefik proxy`_
-* `Traefik mesh`_
+In the `Summary`_ we will have a few take away points to see how Traefik might help us and how it might fit in the AWS
+landscape.
+
+What is `Traefik`_?
+--------------------
+
+From their GitHub Repository:
+
+.. pull-quote::
+
+    Traefik (pronounced traffic) is a modern HTTP reverse proxy and load balancer that makes deploying microservices easy.
+    Traefik integrates with your existing infrastructure components (Docker, Swarm mode, Kubernetes,
+    Marathon, Consul, Etcd, Rancher, Amazon ECS, ...) and configures itself automatically and dynamically.
+    Pointing Traefik at your orchestrator should be the only configuration step you need.
+
+
+They have 4 different offers as per their marketing site, but today we are only going to look into `Traefik proxy`_.
 
 Traefik Proxy has a native integration into `AWS ECS`_, which makes it a perfect use-case candidate to work locally
 on how it works, and set a different configuration that we will use in AWS, using `ECS Compose-X`_.
 
-Sadly, Traefik Mesh has a hard requirement, as pert its docs: Kubernetes. I get it, but sadden to see that is the only
-use-case that is seems implemented for. Hopefully in the future we will see it implement interface to other control
-planes, such as `AWS CloudMap`_ or straight integration to `AWS AppMesh`_ (`opened that FR.. <https://github.com/traefik/mesh/issues/800>`__).
-
-But, that's okay, we will use both CloudMap and Appmesh today and use the Traefik proxy to deal with ingress.
 
 Let's dive in !
 ==================
 
-For today, we are going to keep the use-case very simple as a kick-starter base into our journey to using Traefik.
+For today, we are going to keep the use-case very simple as for Part 1, in our journey to using `Traefik`_.
 
 Architecture for today's walk-through
 -------------------------------------
 
-Very simple architecture.
+Very simple architecture, we have a VPC, public and private subnets to deploy our resources into.
+Our NLB will be public facing to make some tests, our application containers in ECS running in private networks.
+Route53 and CloudMap will handle DNS for us, whilst ACM handles providing us with a SSL certificate that we use on the
+TLS listener of our NLB.
+
 
 .. image:: ../../traefik/part_1/TraefikPart1.png
 
 Getting started
 ---------------------
 
-So naturally, the first step is to read the documentation, and the Traefik docs team has done a really good job at explaining
-how to make it work. And as expected, we find `this documentation on using it with docker-compose`_. That shall be our
-starting point.
+So naturally, the first step is to read the documentation, and the `Traefik`_ docs team has done a really good job at explaining
+how to make it work.
+
+As expected, we find `this documentation on using it with docker-compose`_. That shall be our starting point.
 
 .. note::
 
@@ -238,7 +256,7 @@ So we Lookup the certificate in ACM first.
 .. attention::
 
     As per the `Traefik Proxy Protocol documentation`_, when setting up behind a Load Balancer, one want to use one
-    that supports Proxy Protocol. So we enable it on our ALB for our service target.
+    that supports Proxy Protocol. So we enable it on our NLB for our service target.
 
     .. literalinclude:: ../../traefik/part_1/aws.yaml
         :lines: 132-138
@@ -403,3 +421,4 @@ topologies and adding a Service Mesh.
 .. _Traefik Proxy Protocol documentation: https://doc.traefik.io/traefik/routing/entrypoints/#proxyprotocol
 .. _AWS ECS & CloudWatch with Prometheus: https://labs.compose-x.io/monitoring/ecs-containers-insights-prometheus.html
 .. _Grafana with ALB and Cognito + AzureAD: https://labs.compose-x.io/apps/grafana.html
+.. _Slack Community Channel: https://join.slack.com/t/compose-x/shared_invite/zt-uihmlsiq-sVyYHOQBnSBFctS5~PUHzw
