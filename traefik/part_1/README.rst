@@ -8,7 +8,16 @@ TLDR; Traefik is easy to work with locally and in ECS, making it a great match f
 
 .. note::
 
-    To follow the following with `ECS Compose-X`_ make sure to use version 0.16.5 or above.
+    To follow the following with `ECS Compose-X`_ make sure to use version 0.18 or above.
+
+Installation of ECS Compose-X
+===============================
+
+.. code-block:: bash
+
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install "ecs_composex>=0.18.0"
 
 Introduction
 ===============
