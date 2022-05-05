@@ -1,1 +1,1 @@
-ecs_composex>=0.15.2
+ecs_composex>=0.18.0

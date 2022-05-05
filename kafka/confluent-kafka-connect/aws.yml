@@ -1,128 +1,100 @@
----
+
 version: '3.8'
-services:
-  connect:
-    secrets:
-      - CONNECT_CREDS
-    ports:
-      - "8083:8083"
-    deploy:
-      replicas: 3
-    x-scaling:
-      Range: "1-6"
-      TargetScaling:
-        MemoryTarget: 75
-    x-alarms:
-      Predefined:
-        HighCpuUsageAndMaxScaledOut:
-          Topics:
-            - x-sns: connect-alarms
-          Settings:
-            CPUUtilization: 85
-            RunningTaskCount: 6
-            Period: 60
-            EvaluationPeriods: 15
-            DatapointsToAlarm: 5
-        HighRamUsageAndMaxScaledOut:
-          Topics:
-            - x-sns: connect-alarms
-          Settings:
-            MemoryUtilization: 80
-            RunningTaskCount: 6
-            Period: 60
-            EvaluationPeriods: 15
-            DatapointsToAlarm: 5
-    x-network:
-      UseCloudmap: True
-      Ingress:
-        Myself: True
-
-  connect-files:
-    environment:
-      ENV: dev
-      ECS_CONFIG_CONTENT: |
-
-        files:
-          /opt/connect/truststore.jks:
-            mode: 555
-            source:
-              S3:
-                BucketName: ${!CONNECT_BUCKET}
-                Key: truststore.jks
-          /opt/connect/core.jks:
-            mode: 555
-            source:
-              S3:
-                BucketName: ${!CONNECT_BUCKET}
-                Key: {!ENV}.jks
-
-x-s3:
-  connect-bucket:
-    Lookup:
-      Tags:
-        - aws:cloudformation:logical-id: bucket01
-        - CreatedByComposeX: "true"
-        - live: "no"
-      RoleArn: ${NONPROD_RO_ROLE_ARN}
-    Services:
-      - name: connect
-        access:
-          bucket: ListOnly
-          objects: ReadOnly
-    Settings:
-      EnvNames:
-        - CONNECT_BUCKET
-
-secrets:
-  CONNECT_CREDS:
-    x-secrets:
-        Name: /kafka/cluster-id/connect-cluster-creds
-        JsonKeys:
-          - SecretKey: SCHEMA_REGISTRY_URL
-          - SecretKey: SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
-          - SecretKey: CONNECT_SCHEMA_REGISTRY_URL
-          - SecretKey: CONNECT_SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
-          - SecretKey: CONNECT_BOOTSTRAP_SERVERS
-          - SecretKey: CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL
-          - SecretKey: CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
-          - SecretKey: CONNECT_SASL_JAAS_CONFIG
-
-          - SecretKey: CONNECT_PRODUCER_SASL_JAAS_CONFIG
-          - SecretKey: CONNECT_PRODUCER_CONFLUENT_MONITORING_INTERCEPTOR_SASL_JAAS_CONFIG
-
-          - SecretKey: CONNECT_CONSUMER_SASL_JAAS_CONFIG
-          - SecretKey: CONNECT_CONSUMER_CONFLUENT_MONITORING_INTERCEPTOR_SASL_JAAS_CONFIG
-
-          - SecretKey: CONNECT_CONSUMER_VALUE_CONVERTER_SCHEMA_REGISTRY_URL
-          - SecretKey: CONNECT_CONSUMER_VALUE_CONVERTER_SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
-
-          - SecretKey: CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL
-            VarName: CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL
-          - SecretKey: CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
-            VarName: CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
-          - SecretKey: CONNECT_CONSUMER_VALUE_CONVERTER_SCHEMA_REGISTRY_URL
-            VarName: CONNECT_CONSUMER_KEY_CONVERTER_SCHEMA_REGISTRY_URL
-          - SecretKey: CONNECT_CONSUMER_VALUE_CONVERTER_SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
-            VarName: CONNECT_CONSUMER_KEY_CONVERTER_SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
-
-x-cluster:
-  Use: dev
-
-x-dns:
-  PrivateNamespace:
-    Name: kafka.internal
-    Lookup:
-      RoleArn: ${NONPROD_RO_ROLE_ARN}
-
-
-x-sns:
-  Topics:
-    connect-alarms:
-      Properties: {}
-
-x-tags:
-  environment: ${ENV_NAME:-dev}
-
 networks:
   internal:
     x-vpc: InternalSubnets
+secrets:
+  CONNECT_CREDS:
+    x-secrets:
+      JsonKeys:
+        - SecretKey: SCHEMA_REGISTRY_URL
+        - SecretKey: SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
+        - SecretKey: CONNECT_SCHEMA_REGISTRY_URL
+        - SecretKey: CONNECT_SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
+        - SecretKey: CONNECT_BOOTSTRAP_SERVERS
+        - SecretKey: CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL
+        - SecretKey: CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
+        - SecretKey: CONNECT_SASL_JAAS_CONFIG
+        - SecretKey: CONNECT_PRODUCER_SASL_JAAS_CONFIG
+        - SecretKey: CONNECT_PRODUCER_CONFLUENT_MONITORING_INTERCEPTOR_SASL_JAAS_CONFIG
+        - SecretKey: CONNECT_CONSUMER_SASL_JAAS_CONFIG
+        - SecretKey: CONNECT_CONSUMER_CONFLUENT_MONITORING_INTERCEPTOR_SASL_JAAS_CONFIG
+        - SecretKey: CONNECT_CONSUMER_VALUE_CONVERTER_SCHEMA_REGISTRY_URL
+        - SecretKey: CONNECT_CONSUMER_VALUE_CONVERTER_SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
+        - SecretKey: CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL
+          VarName: CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL
+        - SecretKey: CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
+          VarName: CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
+        - SecretKey: CONNECT_CONSUMER_VALUE_CONVERTER_SCHEMA_REGISTRY_URL
+          VarName: CONNECT_CONSUMER_KEY_CONVERTER_SCHEMA_REGISTRY_URL
+        - SecretKey: CONNECT_CONSUMER_VALUE_CONVERTER_SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
+          VarName: CONNECT_CONSUMER_KEY_CONVERTER_SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
+      Name: /kafka/cluster-id/connect-cluster-creds
+services:
+  connect:
+    deploy:
+      replicas: 3
+    ports:
+      - 8083:8083
+    secrets:
+      - CONNECT_CREDS
+    x-alarms:
+      Predefined:
+        HighCpuUsageAndMaxScaledOut:
+          Settings:
+            CPUUtilization: 85
+            DatapointsToAlarm: 5
+            EvaluationPeriods: 15
+            Period: 60
+            RunningTaskCount: 6
+          Topics:
+            - x-sns: connect-alarms
+        HighRamUsageAndMaxScaledOut:
+          Settings:
+            DatapointsToAlarm: 5
+            EvaluationPeriods: 15
+            MemoryUtilization: 80
+            Period: 60
+            RunningTaskCount: 6
+          Topics:
+            - x-sns: connect-alarms
+    x-network:
+      x-cloudmap: PrivateNamespace
+      Ingress:
+        Myself: true
+    x-scaling:
+      Range: 1-6
+      TargetScaling:
+        MemoryTarget: 75
+  connect-files:
+    environment:
+      ECS_CONFIG_CONTENT: "\nfiles:\n  /opt/connect/truststore.jks:\n    mode: 555\n\
+        \    source:\n      S3:\n        BucketName: ${!CONNECT_BUCKET}\n        Key:\
+        \ truststore.jks\n  /opt/connect/core.jks:\n    mode: 555\n    source:\n \
+        \     S3:\n        BucketName: ${!CONNECT_BUCKET}\n        Key: {!ENV}.jks\n"
+      ENV: dev
+
+x-cloudmap:
+  PrivateNamespace:
+    Name: kafka.internal
+x-cluster:
+  Lookup:
+    ClusterName: test
+x-s3:
+  connect-bucket:
+    Lookup:
+      RoleArn: ${NONPROD_RO_ROLE_ARN}
+      Tags:
+        - aws:cloudformation:logical-id: bucket01
+        - CreatedByComposeX: 'true'
+        - live: 'no'
+    Services:
+      connect:
+        Access:
+          bucket: ListOnly
+          objects: ReadOnly
+x-sns:
+  connect-alarms:
+    Properties: {}
+x-tags:
+  environment: ${ENV_NAME:-dev}

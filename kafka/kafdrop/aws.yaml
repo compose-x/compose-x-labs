@@ -1,225 +1,130 @@
----
-# Docker compose override file for AWS dev environment
-
-version: "3.8"
-
+version: '3.8'
 networks:
   internal:
     x-vpc: InternalSubnets
-
-services:
-  kafdrop:
-    secrets:
-      - KAFKA_CREDS
-    environment:
-      KAFDROP: ${ENV_NAME:-prod}
-
-  files-composer:
-    secrets:
-      - KAFKA_CREDS
-    environment:
-      ECS_CONFIG_CONTENT: |
-
-        files:
-          /app/kafka.properties:
-            content: |
-              # Properties
-              ssl.endpoint.identification.algorithm=https
-              sasl.mechanism=PLAIN
-              sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username=\"{{ default | env_override('SASL_USERNAME') }}\" password=\"{{ default | env_override('SASL_PASSWORD') }}\";
-              security.protocol=SASL_SSL
-              # EOF
-
-            mode: 644
-            context: jinja2
-
-          /app/start.sh:
-            content: |
-
-              echo ${!PWD}
-              echo {{ default | env_override('BOOTSTRAP_SERVERS') }}
-              echo {{ default | env_override('SCHEMA_REGISTRY_URL') }}
-              ls -l /app
-              cd /app
-              echo ${!PWD}
-
-              java --add-opens=java.base/sun.nio.ch=ALL-UNNAMED                                           \
-                -jar /app/kafdrop.jar                                                                     \
-                --kafka.brokerConnect={{ default | env_override('BOOTSTRAP_SERVERS') }}                   \
-                --schemaregistry.connect={{ default | env_override('SCHEMA_REGISTRY_URL') }}              \
-                --schemaregistry.auth={{ default | env_override('SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO') }}\
-                --topic.deleteEnabled=false                                                               \
-                --topic.createEnabled=false
-            mode: 755
-            context: jinja2
-
-          /app/kafdrop.jar:
-            source:
-              S3:
-                BucketName: files.compose-x.io
-                Key: app-demos/kafdrop/kafdrop-3.28.0-SNAPSHOT.jar
-            mode: 644
-
-          /etc/nginx/dhparam.pem:
-            source:
-              S3:
-                BucketName: files.compose-x.io
-                Key: labs/files-composer/dhkeys/dhparam_9.pem
-            mode: 600
-
-        certificates:
-          x509:
-            /etc/nginx:
-              keyFileName: nginx.key
-              certFileName: nginx.crt
-
-    x-iam:
-      PermissionsBoundary: ccoe/js-developer
-      Policies:
-        - PolicyName: S3GetAny
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Sid: GetAnyObjectFromAnywhere
-                Effect: Allow
-                Action:
-                  - s3:GetObject*
-                Resource:
-                  - arn:aws:s3:::files.compose-x.io/*
-
 secrets:
   KAFKA_CREDS:
     x-secrets:
-      Name: kafka/eu-west-1/lkc-z6v51/kafdrop.prod
       JsonKeys:
         - SecretKey: BOOTSTRAP_SERVERS
         - SecretKey: SASL_USERNAME
         - SecretKey: SASL_PASSWORD
         - SecretKey: SCHEMA_REGISTRY_URL
         - SecretKey: SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO
-
-x-cluster:
-  Use: ${ENV_NAME:-prod}
-
-x-vpc:
-  Lookup:
-    VpcId:
-      Tags:
-        - Name: vpc--composex-prod
-    InternalSubnets :
-      Tags:
-        - vpc::usage: application
-        - vpc::internal: "true"
-        - vpc::primary: "false"
-    AppSubnets:
-      Tags:
-        - vpc::usage: application
-        - vpc::internal: "false"
-        - vpc::primary: "true"
-    PublicSubnets:
-      Tags:
-        - vpc::usage: public
-    StorageSubnets:
-      Tags:
-        - vpc::usage: storage
-
-x-dns:
-  PublicZone:
-    Name: prod.compose-x.io
-    Lookup:
-      RoleArn: ${PROD_RO_ROLE_ARN}
-  PrivateNamespace:
-    Name: prod.compose-x.internal
-    Lookup:
-      RoleArn: ${PROD_RO_ROLE_ARN}
-  Records:
-    - Properties:
-        Name: kafdrop.prod.compose-x.io
-        Type: A
-      Target: x-elbv2::kafdrop-cc-scAlb
+      Name: kafka/eu-west-1/lkc-a878or/kafdrop.prod
+services:
+  files-composer:
+    environment:
+      ECS_CONFIG_CONTENT: "\nfiles:\n  /app/kafka.properties:\n    content: |\n  \
+        \    # Properties\n      ssl.endpoint.identification.algorithm=https\n   \
+        \   sasl.mechanism=PLAIN\n      sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule\
+        \ required username=\\\"{{ default | env_override('SASL_USERNAME') }}\\\"\
+        \ password=\\\"{{ default | env_override('SASL_PASSWORD') }}\\\";\n      security.protocol=SASL_SSL\n\
+        \      # EOF\n\n    mode: 644\n    context: jinja2\n\n  /app/start.sh:\n \
+        \   content: |\n\n      echo ${!PWD}\n      echo {{ default | env_override('BOOTSTRAP_SERVERS')\
+        \ }}\n      echo {{ default | env_override('SCHEMA_REGISTRY_URL') }}\n   \
+        \   ls -l /app\n      cd /app\n      echo ${!PWD}\n\n      java --add-opens=java.base/sun.nio.ch=ALL-UNNAMED\
+        \                                           \\\n        -jar /app/kafdrop.jar\
+        \                                                                     \\\n\
+        \        --kafka.brokerConnect={{ default | env_override('BOOTSTRAP_SERVERS')\
+        \ }}                   \\\n        --schemaregistry.connect={{ default | env_override('SCHEMA_REGISTRY_URL')\
+        \ }}              \\\n        --schemaregistry.auth={{ default | env_override('SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO')\
+        \ }}\\\n        --topic.deleteEnabled=false                              \
+        \                                 \\\n        --topic.createEnabled=false\n\
+        \    mode: 755\n    context: jinja2\n\n  /app/kafdrop.jar:\n    source:\n\
+        \      S3:\n        BucketName: files.compose-x.io\n        Key: app-demos/kafdrop/kafdrop-3.28.0-SNAPSHOT.jar\n\
+        \    mode: 644\n\n  /etc/nginx/dhparam.pem:\n    source:\n      S3:\n    \
+        \    BucketName: files.compose-x.io\n        Key: labs/files-composer/dhkeys/dhparam_9.pem\n\
+        \    mode: 600\n\ncertificates:\n  x509:\n    /etc/nginx:\n      keyFileName:\
+        \ nginx.key\n      certFileName: nginx.crt\n"
+    secrets:
+      - KAFKA_CREDS
+    x-iam:
+      PermissionsBoundary: ccoe/js-developer
+      Policies:
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - s3:GetObject*
+                Effect: Allow
+                Resource:
+                  - arn:aws:s3:::files.compose-x.io/*
+                Sid: GetAnyObjectFromAnywhere
+            Version: '2012-10-17'
+          PolicyName: S3GetAny
+  kafdrop:
+    environment:
+      KAFDROP: ${ENV_NAME:-prod}
+    secrets:
+      - KAFKA_CREDS
 
 x-acm:
   kafdrop-certs:
     MacroParameters:
       DomainNames:
         - kafdrop.prod.compose-x.io
-
-#x-cognito_userpool:
-#  kafdrop-pool:
-#    Lookup:
-#      Tags:
-#        - application: kafdrop
-#        - environment: prod
-#      RoleArn: ${PROD_RO_ROLE_ARN}
-
+x-cloudmap:
+  PrivateNamespace:
+    Lookup:
+      RoleArn: ${PROD_RO_ROLE_ARN}
+    Name: prod.compose-x.internal
+x-cluster:
+  Lookup:
+    ClusterName: ${ENV_NAME:-prod}
 x-elbv2:
   kafdrop-cc-scAlb:
-    Settings:
-      Subnets: PublicSubnets
-    Properties:
-      Scheme: internet-facing
-      Type: application
+    Listeners:
+      - DefaultActions:
+          - Redirect: HTTP_TO_HTTPS
+        Port: 80
+        Protocol: HTTP
+      - Certificates:
+          - x-acm: kafdrop-certs
+        Port: 443
+        Protocol: HTTPS
+        SslPolicy: ELBSecurityPolicy-FS-1-2-Res-2020-10
+        Targets:
+          - access: /
+            name: kafdrop:nginx
     MacroParameters:
       Ingress:
         ExtSources:
-          - IPv4: 0.0.0.0/0
+          - Description: ANY
+            IPv4: 0.0.0.0/0
             Name: ANY
-            Description: ANY
-    Listeners:
-      - Port: 80
-        Protocol: HTTP
-        DefaultActions:
-          - Redirect: HTTP_TO_HTTPS
-      - Port: 443
-        Protocol: HTTPS
-        SslPolicy: ELBSecurityPolicy-FS-1-2-Res-2020-10
-        Certificates:
-          - x-acm: kafdrop-certs
-        Targets:
-          - name: kafdrop:nginx
-            access: /
-#            CreateCognitoClient:
-#              UserPoolId: kafdrop-pool
-#              GenerateSecret: true
-#              AllowedOAuthScopes:
-#                - email
-#                - profile
-#                - openid
-#              AllowedOAuthFlows:
-#                - code
-#              CallbackURLs:
-#                - https://kafdrop.prod.compose-x.io/oauth2/idpresponse
-#              DefaultRedirectURI: https://kafdrop.prod.compose-x.io/oauth2/idpresponse
-#              EnableTokenRevocation: true
-#              ExplicitAuthFlows:
-#                - ALLOW_USER_SRP_AUTH
-#                - ALLOW_REFRESH_TOKEN_AUTH
-#              AccessTokenValidity: 1
-#              RefreshTokenValidity: 1
-#              AllowedOAuthFlowsUserPoolClient: true
-#              WriteAttributes:
-#                - email
-#                - family_name
-#                - given_name
-#                - name
-#                - nickname
-#                - profile
-#              ReadAttributes:
-#                - email
-#                - family_name
-#                - given_name
-#                - name
-#                - nickname
-#                - profile
-#              SupportedIdentityProviders:
-#                - AzureSSO
-#            AuthenticateCognitoConfig:
-#              OnUnauthenticatedRequest: authenticate
-#              Scope: openid email profile
-#              SessionCookieName: kafdrop
-#              SessionTimeout: 3600
+    Properties:
+      Scheme: internet-facing
+      Type: application
     Services:
-      - name: kafdrop:nginx
+      - healthcheck: 443:HTTPS:4:2:10:5:/actuator:200
+        name: kafdrop:nginx
         port: 443
         protocol: HTTPS
-        healthcheck: 443:HTTPS:4:2:10:5:/actuator:200
+    Settings:
+      Subnets: PublicSubnets
+x-route53:
+  PublicZone:
+    Lookup:
+      RoleArn: ${PROD_RO_ROLE_ARN}
+    Name: prod.compose-x.io
+x-vpc:
+  Lookup:
+    AppSubnets:
+      Tags:
+        - vpc::usage: application
+        - vpc::internal: 'false'
+        - vpc::primary: 'true'
+    InternalSubnets:
+      Tags:
+        - vpc::usage: application
+        - vpc::internal: 'true'
+        - vpc::primary: 'false'
+    PublicSubnets:
+      Tags:
+        - vpc::usage: public
+    StorageSubnets:
+      Tags:
+        - vpc::usage: storage
+    VpcId:
+      Tags:
+        - Name: vpc--composex-prod

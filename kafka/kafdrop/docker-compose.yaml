@@ -1,58 +1,24 @@
----
-# Docker-compose file for Kafdrop service
-
-version: "3.8"
-
-networks:
-  internal:
-
+version: '3.8'
 volumes:
   kafdrop:
   nginx:
 
+networks:
+  internal:
+
 services:
   files-composer:
-    volumes:
-    - kafdrop:/app
-    - nginx:/etc/nginx
+    deploy:
+      labels:
+        ecs.depends.condition: SUCCESS
+        ecs.task.family: kafdrop
     image: public.ecr.aws/compose-x/ecs-files-composer:latest
     networks:
       - internal
-    deploy:
-      labels:
-        ecs.task.family: kafdrop
-        ecs.depends.condition: SUCCESS
-
-  nginx:
-    image: ${REGISTRY_URI}kafdrop-nginx:${IMAGE_TAG:-latest}
     volumes:
-    - nginx:/etc/nginx/ssl:ro
-    networks:
-      - internal
-    build:
-      context: nginx
-    deploy:
-      labels:
-        ecs.task.family: kafdrop
-      replicas: 1
-      resources:
-        reservations:
-          cpus: 0.2
-          memory: 128M
-    ports:
-    - 443:443
-    depends_on:
-      - files-composer
-      - kafdrop
-    x-ecr:
-      InterpolateWithDigest: true
-
+      - kafdrop:/app
+      - nginx:/etc/nginx
   kafdrop:
-    image: public.ecr.aws/compose-x/amazoncorretto:11
-    ports:
-    - 9000:9000
-    volumes:
-    - kafdrop:/app:ro
     depends_on:
       - files-composer
     deploy:
@@ -63,8 +29,38 @@ services:
         reservations:
           cpus: 0.5
           memory: 1GB
-    x-iam:
-      PermissionsBoundary: ccoe/js-developer
-    entrypoint: ["/bin/bash", "/app/start.sh"]
+    entrypoint:
+      - /bin/bash
+      - /app/start.sh
+    image: public.ecr.aws/compose-x/amazoncorretto:11
     networks:
       - internal
+    ports:
+      - 9000:9000
+    volumes:
+      - kafdrop:/app:ro
+    x-iam:
+      PermissionsBoundary: ccoe/js-developer
+  nginx:
+    build:
+      context: nginx
+    depends_on:
+      - files-composer
+      - kafdrop
+    deploy:
+      labels:
+        ecs.task.family: kafdrop
+      replicas: 1
+      resources:
+        reservations:
+          cpus: 0.2
+          memory: 128M
+    image: ${REGISTRY_URI}kafdrop-nginx:${IMAGE_TAG:-latest}
+    networks:
+      - internal
+    ports:
+      - 443:443
+    volumes:
+      - nginx:/etc/nginx/ssl:ro
+    x-ecr:
+      InterpolateWithDigest: true

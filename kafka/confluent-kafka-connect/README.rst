@@ -28,12 +28,19 @@ In order to work as a group, the nodes also use a heartbeat mechanism, hence why
 
 .. code-block:: yaml
 
-    x-network:
-      UseCloudmap: True
-      Ingress:
-        Myself: True
+    services:
+      connect:
+        x-network:
+          x-cloudmap: PrivateNamespace
+          Ingress:
+            Myself: True
 
-This will allow ingress from the connect nodes to talk to each other.
+    x-cloudmap:
+      PrivateNamespace:
+        Name: kafka.internal
+
+This will allow ingress from the connect nodes to talk to each other, and register `connect.kafka.internal` in a new
+AWS CloudMap private namespace.
 
 .. tip::
 
@@ -258,12 +265,13 @@ For example, if you have tags on your VPC and subnets, you could use the followi
 .. tip::
 
     If you already have an ECS Cluster and EC2 nodes that you wish to deploy to, simply specify that ecs cluster to use.
-    For example, if your cluster is called **dev**
+    For example, if your cluster is called **test**
 
     .. code-block::
 
         x-cluster:
-          Use: dev
+          Lookup:
+            ClusterName: test
 
 Now, to deploy, you could simply build the docker image for connect, publish to an ECR repository, and deploy
 

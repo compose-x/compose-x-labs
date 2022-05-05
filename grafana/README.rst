@@ -172,13 +172,12 @@ In this configuration, we are using AWS S3 to store Grafana images.
               - ServerSideEncryptionByDefault:
                   SSEAlgorithm: AES256
         Services:
-          - name: grafana
-            access:
+          grafana:
+            Access:
               bucket: ListOnly
               objects: RW
-        Settings:
-          EnvVars:
-            - GF_EXTERNAL_IMAGE_STORAGE_S3_BUCKET
+	    ReturnValues:
+	      BucketName: GF_EXTERNAL_IMAGE_STORAGE_S3_BUCKET
 
 Note that we are exposing the bucket name to the grafana service through Settings.EnvVars.GF_EXTERNAL_IMAGE_STORAGE_S3_BUCKET
 
@@ -195,8 +194,9 @@ We also use Aurora MySQL as database to store all our configuration and dashboar
           DatabaseName: grafana
           StorageEncrypted: True
         Services:
-          - name: grafana
-            access: RW
+          grafana:
+            Access:
+	      DbCluster: RO
             SecretsMappings:
               Mappings:
                 host: GF_DATABASE_HOST
