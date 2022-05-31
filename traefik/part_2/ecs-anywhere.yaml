@@ -1,0 +1,78 @@
+---
+# Docker compose with overrides and config to run in AWS ECS
+
+version: "3.8"
+services:
+  traefik:
+    ports:
+       - 8000:80/tcp
+    expose:
+      - 8080/tcp
+    labels:
+      container_name: traefik
+    environment:
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-west-1}
+    command:
+      #- "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.ecs.autoDiscoverClusters=true"
+      - "--providers.ecs.exposedByDefault=true"
+      - "--providers.ecs.refreshSeconds=15"
+      - "--providers.ecs.clusters=${CLUSTER_NAME}"
+      - "--entrypoints.web.address=:80"
+      - "--metrics"
+      - '--metrics.prometheus=true'
+      - "--metrics.prometheus.addServicesLabels=true"
+      - "--metrics.prometheus.addrouterslabels=true"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.web.proxyProtocol.trustedIPs=192.168.103.0/24"
+    x-iam:
+      Policies:
+        - PolicyName: TraefikRecommended
+          PolicyDocument: {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "TraefikECSReadAccess",
+                "Effect": "Allow",
+                "Action": [
+                    "ecs:ListClusters",
+                    "ecs:DescribeClusters",
+                    "ecs:ListTasks",
+                    "ecs:DescribeTasks",
+                    "ecs:DescribeContainerInstances",
+                    "ecs:ListContainerInstances",
+                    "ecs:DescribeTaskDefinition",
+                    "ec2:DescribeInstances"
+                ],
+                "Resource": [
+                    "*"
+                ]
+              }
+            ]
+          }
+    deploy:
+      labels:
+        ecs.compute.platform: EXTERNAL
+    x-aws-min_percent: 0
+    x-aws-max_percent: 100
+
+  whoami:
+    ports:
+      - 80/tcp
+    deploy:
+      labels:
+        ecs.task.family: whoami
+        ecs.compute.platform: EXTERNAL
+
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.whoami.rule: Path(`/whoami`) # Override for your real domain name for this service.
+    depends_on:
+      - traefik
+    x-aws-min_percent: 0
+    x-aws-max_percent: 100
+
+x-cluster:
+  Lookup:
+    ClusterName: ${CLUSTER_NAME}
