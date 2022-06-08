@@ -79,6 +79,12 @@ Initialize your AWS Account for ECS Compose-X (see `requisites`_)
     monitoring/ecs-containers-insights-prometheus
 
 .. toctree::
+    :caption: Logging with FireLens
+    :maxdepth: 1
+
+    firelens/getting_started
+
+.. toctree::
    :maxdepth: 1
    :caption: Kafka
 

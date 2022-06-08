@@ -1,0 +1,23 @@
+version: "3.8"
+services:
+  frontend:
+    logging:
+      driver: awsfirelens
+      options:
+        Name: cloudwatch
+    x-logging:
+      FireLens:
+        Advanced:
+          SourceFile: extra.conf
+          EnableApiHeathCheck: true
+          GracePeriod: 60
+
+  random-logs:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: my-random-logger
+    x-logging:
+      FireLens:
+        Shorthands:
+          ReplaceAwsLogs: true
