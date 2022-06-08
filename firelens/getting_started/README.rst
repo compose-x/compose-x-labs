@@ -85,6 +85,10 @@ First, let's install ecs-composex
     source compose-x/bin/activate; pip install pip -U
     pip install "ecs-compose-x>=0.21"
 
+    git clone https://github.com/compose-x/compose-x-labs.git
+    cd compose-x-labs/firelens/getting_started/
+
+
 NGINX and logger, "as-is"
 --------------------------
 
