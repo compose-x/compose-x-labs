@@ -1,4 +1,4 @@
-Sphinx==4.4.0
-sphinx-material==0.0.34
-pre-commit==2.9.3
-tbump==6.5.0
+Sphinx>=5.0
+sphinx-material>=0.0.34
+pre-commit>=2.9.3
+tbump>=6.5.0
