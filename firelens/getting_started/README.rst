@@ -17,6 +17,7 @@ TLDR;
 Skip to :ref:`getting_started_example`
 
 You should strongly consider using FireLens + Fluent Bit to ship your logs as an alternative to awslogs agent.
+And ECS Compose-X makes it easy!
 
 Welcome to FireLens
 ====================
@@ -280,6 +281,29 @@ Now, on top of that, it is possible as we will see in future blog posts with Fir
 to make FluentBit work for us in very intelligent ways.
 
 In future examples, we will add more in-depth examples, still very much using NGINX and well known applications.
+
+Why would I use ECS Compose-X to do all that ?
+--------------------------------------------------
+
+To enable FireLens, you will need to
+
+* Ensure you have appropriate IAM permissions
+    * To AWS CloudWatch Logs
+    * To AWS FireHose (if used)
+    * To other AWS Services (to come)
+* Configuration for the driver options point to the right destination
+    * Ensure properties are set correctly
+    * Make sure no setting is missing
+* Configure the sidecar
+    * Add extra ``[PARSER]`` or ``[FILTER]`` in a new image you now need to build
+
+And that's just to use the very baseline of FireLens. In its native configuration, you cannot have more than
+one OUTPUT per service/container defined in the task definition.
+
+Compose-X will allow you to add your own configuration file into the final fluentbit configuration, handle adding
+``[PARSER]`` for you, manage AWS IAM policies to all destinations, verify inputs.
+
+All of that with very little syntax, that you can easily change from one environment to another, and still, no code.
 
 
 .. _FluentD: https://docs.fluentd.org/
