@@ -1,0 +1,18 @@
+version: "3.8"
+services:
+  frontend:
+    ports:
+      - target: 80
+        protocol: tcp
+    deploy:
+      labels:
+        ecs.task.family: web
+    image: nginx
+
+  random-logs:
+    image: chentex/random-logger:latest
+    command: ["1000", "5000", "42"]
+    deploy:
+      labels:
+        ecs.task.family: web
+        ecs.depends.condition: SUCCESS

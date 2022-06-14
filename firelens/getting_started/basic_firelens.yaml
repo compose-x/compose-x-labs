@@ -1,0 +1,17 @@
+version: "3.8"
+services:
+  frontend:
+    logging:
+      driver: awsfirelens
+      options:
+        Name: cloudwatch
+
+  random-logs:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: my-random-logger
+    x-logging:
+      FireLens:
+        Shorthands:
+          ReplaceAwsLogs: true
