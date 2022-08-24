@@ -1,0 +1,24 @@
+---
+# Prometheus & Monitoring configuration settings.
+files:
+  /prom/config/prometheus.yaml:
+    content: |
+      global:
+        scrape_interval: 1m
+
+      scrape_configs:
+        # Let's self-monitor.
+        - job_name: "prometheus"
+          scrape_interval: 1m
+          static_configs:
+          - targets: ["localhost:9090"]
+
+      # Remote write to AWS Managed Prometheus.
+      remote_write:
+        - url: {{ env_var('AMP_REMOTEW_URL') | safe }}
+          queue_config:
+            max_samples_per_send: 1000
+            max_shards: 200
+            capacity: 2500
+          sigv4:
+            region: {{ env_var('AWS_DEFAULT_REGION') | safe }}
