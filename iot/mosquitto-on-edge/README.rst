@@ -11,25 +11,25 @@ MQTT persistence with AWS IOT core bridge with Mosquitto
 TL;DR
 ======
 
-Using AWS IOT Core and Mosquitto, all local MQTT transactions are synchronized on AWS for persistence and future-proofing.
+Using AWS IoT Core and Mosquitto, all local MQTT transactions are synchronized on AWS for persistence and future-proofing.
 
 Background
 ===========
 
-As a "homelab" person, and an AWS architect, it is sometimes very conflicting to want to go for an in-house solution
+As a "home lab" person, and an AWS architect, it is sometimes very conflicting to want to go for an in-house solution
 vs an in-the-cloud one.
 
-I recently got myself into using non-wifi smart devices, namely using ZigBee, to control my lights, monitor the house
-(climate control, door states, etc.). Naturally as a python and open-source dev, I got myself into using the excellent
+I recently got myself into using non-wifi smart devices, namely using ZigBee, to control my lights, and monitor the house
+(climate control, door states, etc.). Naturally, as a python and open-source dev, I got myself into using the excellent
 `Home Assistant`_ which has an incredibly good set of integrations to a lot of devices, and allows users to define
 automation/scripts and so on in a very user-friendly interface.
 
-There are many different topologies one can adopt, and the one I chose is to have my ZigBee devices to link back to
-`ZigBee2MQTT`_ which is a bridge/broker between the Zigbee coordinator and MQTT. It receives states messages from the
-devices and publish messages to a MQTT server.
+There are many different topologies one can adopt, and the one I chose is to have my ZigBee devices link back to
+`ZigBee2MQTT`_ is a bridge/broker between the Zigbee coordinator and MQTT. It receives state messages from the
+devices and publishes messages to an MQTT server.
 
 Googling around, I found an `AWS Blog Post`_ and also documentation relating to GreeGrass that would allow anyone to get
-started with on-boarding devices which are local inside a network to publish to AWS IoT Core / Greengrass.
+started with onboarding devices which are local inside a network to publish to AWS IoT Core / Greengrass.
 
 And so I started to test different setups
 
@@ -47,20 +47,20 @@ Before we start though, here are a few things to know for future references
 * `ZigBee`_
 
 
-Design overview
+Design Overview
 -----------------
 
 .. image:: ../../iot/mosquitto-on-edge/mosquitto-on-edge.jpg
 
 I wanted most of all, to be able to keep things private and secure. But also, although there now are the excellent
-AWS IAM Roles anywhere as an option, very few home applications support to use the SDK chain of credentials to
+AWS IAM Roles anywhere as an option, very few home applications support the SDK chain of credentials to
 communicate with AWS, and expect to create IAM users, with an access key and secret key.
 
 So instead, I decided to use `AWS ECS Anywhere`_: I use a Pi4 as an ECS instance in my cluster which is more than capable to
 run a few containers, and because it uses ECS, it will be given a Task Role. That's how to get IAM credentials sorted.
 
 And as usual, `ECS Compose-X`_ comes to "the rescue" in taking away all the complexity of configuring cloud resources,
-and at the same time allow to test everything locally.
+and at the same time allow testing everything locally.
 
 Configuration and deployment
 ===============================
@@ -68,12 +68,12 @@ Configuration and deployment
 Security
 ------------
 
-Although in my home network I have different VLANs for different type of devices, I still wanted to use SSL over the
+Although in my home network I have different VLANs for different types of devices, I still wanted to use SSL over the
 home network for everything related to smart devices, and so I provisioned a few SSL certificates using `Let's Encrypt`_.
-That allows all the services internally to communicate over HTTPs without SSL errors all over the place, but that is not mandatory.
+That allows all the services internally to communicate over HTTPS without SSL errors all over the place, but that is not mandatory.
 
 `ZigBee`_ also uses encryption for Over The Air (you might see it written OTA) communication. I won't go into the details
-of it and will encourage to look into the documentation and RFC that describes that protocol.
+of it and will encourage you to look into the documentation and RFC that describes that protocol.
 
 As for secrets and other credentials like resources, they will be stored in `AWS Secrets Manager`_,.
 
@@ -81,7 +81,7 @@ AWS IoT core
 ^^^^^^^^^^^^^^
 
 You could skip this step if you are not interested in using AWS IoT core and rely solely on your local storage for
-messages, but for me AWS IoT is the place I want to persist, through bridging, the messages and topics. This opens
+messages, but for me, AWS IoT is the place I want to persist, through bridging the messages and topics. This opens
 up tons of opportunities for future work as well.
 
 If you do wish to use AWS IoT Core, then you will need to do a few things, most of which are documented in the `AWS Blog Post`_.
@@ -124,7 +124,7 @@ To store the files, simply run the following commands
 
 .. attention::
 
-    Make sure you are storing these into a secure, non public bucket.
+    Make sure you are storing these in a secure, non-public bucket.
 
 One could implement a renewal with a new certificate at each new container creation, but the implications of doing
 that aren't clear at this point, so just following the least path of resistance. Also, that allows us to do all the
@@ -137,16 +137,16 @@ your account's endpoint.
 
     aws iot describe-endpoint --endpoint-type iot:Data-ATS
 
-Keep it handy, we will use it in the docker compose file in a little while.
+Keep it handy, we will use it in the docker-compose file in a little while.
 
 Home-Assistant authentication
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-MQTT supports multiple ways to authenticate, one of which is a very simple username/password, very similar to basic
+MQTT supports multiple ways to authenticate, one of which is a very simple username/password, very similar to the basic
 authentication you would for Apache2/NGINX web servers. Generate a new password file using the instructions documented
 `in the official Mosquitto documentation <https://mosquitto.org/documentation/authentication-methods/>`_
 
-For examples, we will assume that the Mosquitto secret file is called ``mosquitto_auth``
+For example, we will assume that the Mosquitto secret file is called ``mosquitto_auth``
 
 Once we have the file, we store it as-is in AWS Secrets Manager. We could also just equally store it into S3 with the
 other files for this project.
@@ -158,12 +158,12 @@ other files for this project.
 Mosquitto configuration
 ------------------------
 
-Alright, we have all the files and configuration, but where does that go ? We are going to use template files locally,
+Alright, we have all the files and configuration, but where does that go? We are going to use template files locally,
 which using `Files Composer`_ we will be able to render at the time our containers get created. That avoids storing and
-hardcoding values that will change based on environment, location and so forth. And keep things secret / secure at the
+hardcoding values that will change based on environment, location, and so forth. And keep things secret/secure at the
 same time.
 
-First, let's have a look at the bridge.conf.j2 file, which will be used by mosquitto to establish the mqtt bridge.
+First, let's have a look at the bridge.conf.j2 file, which will be used by mosquitto to establish the MQTT bridge.
 
 .. literalinclude:: ../../iot/mosquitto-on-edge/bridge.conf.j2
 
@@ -215,19 +215,19 @@ Looking back
 Why not just use AWS IoT core + rules & Lambda ?
 ----------------------------------------------------
 
-`Home Assistant`_ is very popular, just works, is open source, and cloud agnostic. And for many reasons I think it is
-on of the very best projects out there. So yes, one could re-implement in the form of AWS IoT devices, rules with
+`Home Assistant`_ is very popular, just works, is open source, and cloud agnostic. And for many reasons, I think it is
+one of the very best projects out there. So yes, one could re-implement in the form of AWS IoT devices, rules with
 AWS Lambda functions, a fair number of the functionalities implemented today in it.
 
-But that would mean "re-inventing the wheel". And further to that, the consumer grade devices today aren't meat to
+But that would mean "re-inventing the wheel". And further to that, the consumer-grade devices today aren't meant to
 connect to AWS IoT directly. Using the MQTT broker to retain the MQTT messages and possibly tomorrow have more MQTT
 brokers for distributed installations in different places, is an easy and safe way to repeat the process.
 
 But what about costs?
 -------------------------
 
-The more devices, the more messages, the more messages, the higher the costs. At the start of the project I also
-had configured `Mosquitto`_ to relay the messages in both ways, which doubled un-necessarily the costs. But we are
+The more devices, the more messages, the more messages, the higher the costs. At the start of the project, I also
+had configured `Mosquitto`_ to relay the messages in both ways, which doubled unnecessarily the costs. But we are
 still talking about $1 to 2$ at the most.
 
 Using AWS IoT core is a simple way for me to achieve multiple things:
@@ -236,11 +236,11 @@ Using AWS IoT core is a simple way for me to achieve multiple things:
 * Future proof and prepare for distributed locations
 * Not rely on my local hardware.
 
-At the moment for 20+ devices, all connected via Zigbee and MQTT to home-assistant, I pay a mere just about $4 a month.
-A cost I am very happy to pay for privacy and piece of mind.
+At the moment for 20+ devices, all connected via Zigbee and MQTT to Home Assistant, I pay a mere just about $4 a month.
+A cost I am very happy to pay for privacy and peace of mind.
 
 
-Home Assistant not connected to IoT core directly ?
+Home Assistant not connected to IoT core directly?
 ----------------------------------------------------
 
 Great question I hear, and there are two reasons.
@@ -249,7 +249,7 @@ The first one is, faced a few issues with the HA MQTT configuration, it just wou
 to connect to IoT core. Something to dig into for future implementations I suppose.
 
 But then also arose the second and to me, **the** reason to use a broker even in a multi-site deployment: having a local
-MQTT broker, enables to work offline: if circumstances were to loose internet access, and therefore no access to AWS
+MQTT broker enables to work offline: if circumstances were to lose internet access, and therefore no access to AWS
 IoT core, all my home automation, driven by Home Assistant, still works perfectly well.
 
 
@@ -259,14 +259,14 @@ Looking ahead
 Not relying on local hardware for persistence
 ---------------------------------------------
 
-This will be a repeating point in the IoT series. Using AWS ECS Anywhere and local hardware, namely Pis, NUCs etc.
+This will be a repeating point in the IoT series. Using AWS ECS Anywhere and local hardware, namely Pis, NUCs, etc.
 is only a mean to an end, but as much as possible, the success criteria for me is to apply the same philosophy of
-"cattles vs pets": yes, I need hardware to run the applications, but I need not to depend on it and be able to change
+"cattle vs pets": yes, I need hardware to run the applications, but I need not depend on it and be able to change
 or replace it quickly from one host to another just like I would in using AWS Fargate.
 
 Working on this project, the final goal evolved as I went, but generally speaking, it has been a lot of fun and
-very much enjoyed learning new things, getting deeper into IoT and using `AWS ECS Anywhere`_ to establish persistence
-in the cloud at low cost.
+very much enjoyed learning new things, getting deeper into IoT, and using `AWS ECS Anywhere`_ to establish persistence
+in the cloud at a low cost.
 
 .. _Home Assistant: https://www.home-assistant.io/
 .. _AWS ECS Anywhere: https://aws.amazon.com/ecs/anywhere/
