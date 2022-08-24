@@ -92,6 +92,12 @@ Initialize your AWS Account for ECS Compose-X (see `requisites`_)
    kafka/restproxy
    kafka/kafdrop
 
+.. toctree::
+    :maxdepth: 1
+    :caption: IoT with ECS Anywhere
+
+    iot/mosquitto-on-edge
+
 Indices and tables
 ==================
 * :ref:`genindex`

@@ -1,0 +1,21 @@
+# We listen on the non-TLS port
+listener 1883
+
+# We also enable the TLS enabled port. Optional.
+listener 8883
+
+protocol mqtt
+# We clearly indicate we don't want to persist the messages to local disk.
+# If you don't want to use AWS IoT core for persistence, change to true.
+persistence false
+
+# Optional, the SSL key and certificate to use. Comment out not to use it.
+keyfile /mosquitto/acme/privkey.pem
+certfile /mosquitto/acme/fullchain.pem
+
+# This is our authentication file that will enable basic authentication to MQTT.
+password_file /mosquitto/config/auth_file
+
+# We explicitly instruct to add additional files, here, our bridge configuration.
+# Comment out to disable.
+include_dir /mosquitto/config/conf.d

@@ -1,0 +1,28 @@
+# Bridge to AWS IOT
+# ============================================================
+
+connection awsiot
+# Here, the endpoint we retrieved earlier will be set from environment variable to our service.
+address {{ env_var('IOT_ENDPOINT_ADDRESS') }}:8883
+
+bridge_protocol_version mqttv311
+bridge_insecure false
+
+# Bridge connection name and MQTT client Id, enabling the connection automatically when the broker starts.
+cleansession true
+clientid bridgeawsiot
+start_type automatic
+notifications false
+log_type all
+
+# AWS IoT CA certificate that we pull at run time.
+bridge_cafile /etc/mosquitto/certs/rootCA.pem
+
+# These are the files we stored in S3 that belong to our account only.
+bridge_certfile /etc/mosquitto/certs/cert.crt
+bridge_keyfile /etc/mosquitto/certs/private.key
+
+# This instructs to copy all topics to the remote. More details at https://mosquitto.org/man/mosquitto-conf-5.html
+# Section topic pattern [[[ out | in | both ] qos-level] local-prefix remote-prefix]
+
+topic # out 1

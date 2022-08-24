@@ -1,0 +1,70 @@
+---
+# Mosquitto bootstrap files
+
+# Optional, this is how I pull my let's encrypt certificates to enable SSL
+#certbot_store:
+#  home-assistant.home.ews-network.net:
+#    storage_path: /mosquitto/acme/
+
+files:
+  /mosquitto/certs/rootCA.pem: # This file being public, we simply download it.
+    source:
+      Url:
+        Url: https://www.amazontrust.com/repository/AmazonRootCA1.pem
+    context: plain
+    mode: 444
+
+  /mosquitto/certs/private.key: # Key pulled from S3 to authenticate to IoT core
+    source:
+      S3:
+        BucketName: my-secret-bucket
+        Key: mqtt/mosquitto/private.key
+    mode: 600
+
+  /mosquitto/certs/cert.crt: # Certificate to auth to IoT core.
+    source:
+      S3:
+        BucketName: my-secret-bucket
+        Key: mqtt/mosquitto/cert.crt
+    mode: 644
+
+  /mosquitto/config/auth_file: # Here, we expose the secret value as an environment variable. We pull that and store as file.
+    content: |
+      {{ env_var('HA_MQTT') | safe }}
+    context: jinja2
+
+  /mosquitto/config/mosquitto.conf:
+    content: |
+
+      listener 1883
+
+#      listener 8883
+      protocol mqtt
+      persistence false
+
+#      keyfile /mosquitto/acme/privkey.pem
+#      certfile /mosquitto/acme/fullchain.pem
+      password_file /mosquitto/config/auth_file
+      include_dir /mosquitto/config/conf.d
+
+  /mosquitto/config/conf.d/bridge.conf:
+    content: |
+      connection awsiot
+      address {{ env_var('IOT_ENDPOINT_ADDRESS') }}:8883
+
+      topic # out 1
+
+      bridge_protocol_version mqttv311
+      bridge_insecure false
+
+      cleansession true
+      clientid bridgeawsiot
+      start_type automatic
+      notifications false
+      log_type all
+
+      bridge_cafile /mosquitto/certs/rootCA.pem
+      bridge_certfile /mosquitto/certs/cert.crt
+      bridge_keyfile /mosquitto/certs/private.key
+
+    context: jinja2
