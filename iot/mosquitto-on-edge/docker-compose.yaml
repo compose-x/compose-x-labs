@@ -1,0 +1,90 @@
+version: "3.8"
+
+volumes:
+  mqtt: # Volume shared between mosquitto and files-composer to generate the configuration
+
+secrets:
+  HA_MQTT:
+    x-secrets:
+      Name: iot/home/ha/mqtt # The secret we created out of the mosquitto basic auth file.
+      VarName: IOT_HOME_MQTT_HA_ARN
+
+services:
+  mqtt-broker: # Our mosquitto MQTT broker
+    image: eclipse-mosquitto
+    volumes:
+      - mqtt:/mosquitto/
+    ports:
+      - 1883:1883/tcp
+      - 8883:8883/tcp
+    expose:
+      - 9001/tcp
+    deploy:
+      labels: &mqtt-broker-labels
+        ecs.task.family: mqtt-broker
+        ecs.compute.platform: EXTERNAL
+    x-aws-min_percent: 0 # On update, we ensure that we stop the previous MQTT brokers. Recommended especially if you have only one ECS instance in the cluster.
+    x-aws-max_percent: 100
+    depends_on:
+      - mqtt-broker-config # We must wait for the configuration to have completed its job before starting this container.
+    x-iam:
+      Policies:
+        # We grant the MQTT broker with way too many IoT core permissions. AWS IAM will tell us
+        # Which ones to grant after using AWS IAM Analyzer.
+        - PolicyName: MQTTBroker
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: MQTTAccess
+                Effect: Allow
+                Action:
+                  - iot:*
+                Resource:
+                  - "*"
+
+  mqtt-broker-config:
+    image: public.ecr.aws/compose-x/ecs-files-composer:latest
+    deploy:
+      labels:
+        <<: *mqtt-broker-labels
+        # Out MQTT broker configuration init job must succeed. We enforce that behaviour.
+        ecs.depends.condition: SUCCESS
+    command: # The configuration file mosquitto_bootstrap.yaml is stored in AWS SSM, making it easy to update.
+      - --from-ssm
+      - x-ssm_parameter::mqtt-broker-bootstrap::ParameterName
+      - --decode-base64
+      - --context
+      - jinja2
+    environment:
+      IOT_ENDPOINT_ADDRESS: something-ats.iot.eu-west-1.amazonaws.com # Our AWS IOT endpoint.
+    volumes:
+      - mqtt:/mosquitto/:rw
+    secrets:
+      - HA_MQTT
+
+x-cluster:
+  Lookup:
+    ClusterName: ANewCluster # The ECS Cluster you want to deploy the service into. Here the cluster with my Pi instance.
+
+x-ssm_parameter:
+  mqtt-broker-bootstrap: # Stores the mosquitto_bootstrap.yaml into SSM and encodes to Base64 to allow special markers.
+    Properties:
+      DataType: text
+      Type: String
+    MacroParameters:
+      FromFile: mosquitto_bootstrap.yaml
+      EncodeToBase64: True
+    Services:
+      mqtt-broker:
+        Access: RO
+
+x-s3:
+  iot-home: # The bucket that stores the IoT SSL client certificates. We only read access to it.
+    Lookup:
+      Tags:
+        - Name: my-secret-bucket
+    Services:
+      mqtt-broker:
+        Access:
+          objects: ReadOnly
+          bucket: ListOnly
