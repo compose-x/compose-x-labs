@@ -1,0 +1,60 @@
+version: "3.8"
+volumes:
+  prometheus_config: {} # Shared volumes with the prometheus configuration.
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - prometheus_config:/prom/config/
+    command:
+      - '--config.file=/prom/config/prometheus.yaml' # we specifically point to our shared generated config file.
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    expose:
+      - 9090
+    deploy:
+      labels: &prometheus-labels
+        ecs.task.family: prometheus
+        ecs.compute.platform: EXTERNAL # Inform to run using the EXTERNAL / ECS Anywhere instances.
+    depends_on:
+      - prometheus-config
+    x-iam:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonPrometheusRemoteWriteAccess
+
+  prometheus-config:
+    image: public.ecr.aws/compose-x/ecs-files-composer:latest
+    deploy:
+      labels:
+        <<: *prometheus-labels
+        ecs.depends.condition: SUCCESS
+    command:
+      - --from-ssm
+      - x-ssm_parameter::prom-config-init::ParameterName # Automatically use the CFN generated SSM parameter name.
+      - --decode-base64
+    volumes:
+      - prometheus_config:/prom/config/
+    environment:
+      AMP_REMOTEW_URL: https://aps-workspaces.${AWS_DEFAULT_REGION}.amazonaws.com/workspaces/${WORKSPACE_ID}/api/v1/remote_write
+
+x-cluster:
+  Lookup:
+    ClusterName: ANewCluster # ECS Cluster with your on-premise ECS Anywhere instances.
+
+x-ssm_parameter:
+  prom-config-init: # SSM parameter that will contain the files-composer init configuration, executed just before prometheus starts.
+    Properties:
+      DataType: text
+      Type: String
+      Tier: Intelligent-Tiering
+    MacroParameters:
+      FromFile: prometheus-init.yaml
+      EncodeToBase64: true
+    Services:
+      prometheus:
+        Access: RO # We only need the service to have read-only access to the parameter.
