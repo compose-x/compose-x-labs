@@ -1,0 +1,60 @@
+---
+files:
+  /config/traefik.yaml:
+    context: jinja2
+    content: |
+      folders:
+        /traefik_certs/:
+          s3:
+            bucket_name: {{ env_var('BACKUP_BUCKET_NAME')}}
+            prefix_key: {{ env_var('CERTS_PATH')}}/
+          whitelist_regex:
+            - "acme.json$"
+      #EOF
+
+  /traefik_certs/acme.json:
+    mode: "0600"
+    ignore_failure: true
+    source:
+      S3:
+        BucketName: {{ env_var('BACKUP_BUCKET_NAME')}}
+        Key: {{ env_var('CERTS_PATH')}}/acme.json
+
+  /traefik_config/static/home.yaml:
+    context: plain
+    content: |
+      http:
+        routers:
+          homeassistant:
+            service: homeassistant
+            rule: "Host(`home-assistant.home.ews-network.net`)"
+            tls:
+              certresolver: le
+            entrypoints: websecure
+
+          z2mqtt:
+            service: z2mqtt
+            middlewares:
+              - homeauth
+            rule: "Host(`z2mqtt.home.ews-network.net`)"
+            tls:
+              certresolver: le
+            entrypoints: websecure
+
+        middlewares:
+          homeauth:
+            basicAuth:
+              users:
+                - johnpreston:$apr1$YzVhWnFc$tZwfZ6mlu4mNdLMp4CxvE/
+
+
+        services:
+          homeassistant:
+            loadBalancer:
+              servers:
+                - url: "http://192.168.72.16:8123"
+
+          z2mqtt:
+            loadBalancer:
+              servers:
+                - url: "http://192.168.72.16:8099"

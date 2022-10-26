@@ -1,0 +1,84 @@
+version: "3.8"
+volumes:
+  traefik_certs: {}
+  backup_job: {}
+
+# Common config
+
+x-common-config: &ssl-s3-config
+  BACKUP_BUCKET_NAME: x-s3::certificates-bucket::BucketName
+  CERTS_PATH: traefik/acme-prod
+
+services:
+  traefik:
+    depends_on:
+      - traefik-restore
+
+  traefik-restore:
+    image: public.ecr.aws/compose-x/ecs-files-composer:nightly
+    volumes:
+      - traefik_certs:/traefik_certs:rw
+      - backup_job:/config:rw
+    deploy:
+      labels:
+        ecs.task.family: traefik
+        ecs.depends.condition: SUCCESS
+    environment:
+      <<: *ssl-s3-config
+    command:
+      - --from-ssm
+      - x-ssm_parameter::cert-backup-restore::ParameterName
+      - --context
+      - jinja2
+      - --decode-base64
+
+  traefik-backup:
+    image: public.ecr.aws/compose-x/s3-autosync:nightly
+    volumes:
+      - traefik_certs:/traefik_certs:ro
+      - backup_job:/config:rw
+    depends_on:
+      - traefik
+    deploy:
+      labels:
+        ecs.task.family: traefik
+      resources:
+        limits:
+          cpus: 0.1
+          memory: 64MB
+        reservations:
+          cpus: 0.1
+          memory: 64MB
+    command:
+      - -f
+      - /config/traefik.yaml
+      - --debug
+    stop_grace_period: 1m
+    environment:
+      <<: *ssl-s3-config
+
+# AWS Resources
+
+x-ssm_parameter:
+  cert-backup-restore:
+    Properties:
+      DataType: text
+      Type: String
+      Tier: Intelligent-Tiering
+    MacroParameters:
+      FromFile: restore_backup.yaml
+      EncodeToBase64: true
+    Services:
+      traefik:
+        Access: RO
+
+x-s3:
+  certificates-bucket:
+    Lookup:
+      Tags:
+        - usage: certs-backup
+    Services:
+      traefik:
+        Access:
+          objects: RW
+          bucket: ListOnly
