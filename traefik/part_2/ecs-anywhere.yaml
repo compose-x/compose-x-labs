@@ -2,32 +2,117 @@
 # Docker compose with overrides and config to run in AWS ECS
 
 version: "3.8"
+volumes:
+  traefik_certs: {}
 services:
   traefik:
     ports:
-       - 8000:80/tcp
-    expose:
-      - 8080/tcp
-    labels:
-      container_name: traefik
+      - 8088:8080/tcp
     environment:
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-west-1}
     command:
-      #- "--log.level=DEBUG"
       - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--log.format=json"
+
       - "--providers.ecs.autoDiscoverClusters=true"
       - "--providers.ecs.exposedByDefault=true"
       - "--providers.ecs.refreshSeconds=15"
       - "--providers.ecs.clusters=${CLUSTER_NAME}"
-      - "--entrypoints.web.address=:80"
+      - "--providers.ecs.ecsAnywhere=true"
+
       - "--metrics"
       - '--metrics.prometheus=true'
       - "--metrics.prometheus.addServicesLabels=true"
       - "--metrics.prometheus.addrouterslabels=true"
+
       - "--entryPoints.web.address=:80"
       - "--entryPoints.web.proxyProtocol.trustedIPs=192.168.103.0/24"
+
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+
+      # For testing, it is recommended to use the staging endpoint to not go over rate limiting threshold
+#      - "--certificatesresolvers.le.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      - "--certificatesresolvers.le.acme.keyType=RSA4096"
+      - "--certificatesresolvers.le.acme.dnschallenge=true"
+      - "--certificatesresolvers.le.acme.httpChallenge=false"
+      - "--certificatesresolvers.le.acme.tlsChallenge=false"
+      - "--certificatesresolvers.le.acme.dnschallenge.provider=route53"
+      - "--certificatesresolvers.le.acme.email=john@ews-network.net"
+      - "--certificatesresolvers.le.acme.storage=/traefik_certs/acme.json"
+      - "--certificatesresolvers.le.acme.httpChallenge.entryPoint=web"
+
+    labels:
+      container_name: traefik
+      traefik.enable: "true"
+      traefik.http.routers.dashboard.rule: Host(`traefik.bdd-testing.compose-x.io`)
+      traefik.http.routers.dashboard.service: dashboard@internal
+      traefik.http.routers.dashboard.entrypoints: websecure
+      traefik.http.routers.dashboard.tls: "true"
+      traefik.http.routers.dashboard.tls.certResolver: le
+
+      traefik.http.routers.api.rule: Host(`traefik.bdd-testing.compose-x.io`) && PathPrefix(`/api`)
+      traefik.http.routers.api.service: api@internal
+      traefik.http.routers.api.entrypoints: websecure
+      traefik.http.routers.api.tls: "true"
+      traefik.http.routers.api.tls.certResolver: le
+
+      ecs_sd_prometheus_container_port: 8088
+      ecs_sd_prometheus_job_name: traefik
+
+    deploy:
+      labels:
+        ecs.compute.platform: EXTERNAL
+      resources:
+        reservations:
+          cpus: "0.5"
+          memory: 128MB
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    volumes:
+      - traefik_certs:/traefik_certs/:rw
+
+    x-aws-min_percent: 0
+    x-aws-max_percent: 100
     x-iam:
       Policies:
+        - PolicyName: SSMDiscover
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ssm:DescribeInstanceInformation"
+                Resource:
+                  - "*"
+        - PolicyName: Route53UpdatesForACME
+          PolicyDocument: {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "",
+                "Effect": "Allow",
+                "Action": [
+                  "route53:GetChange",
+                  "route53:ChangeResourceRecordSets",
+                  "route53:ListResourceRecordSets"
+                ],
+                "Resource": [
+                  "arn:aws:route53:::hostedzone/*",
+                  "arn:aws:route53:::change/*"
+                ]
+              },
+              {
+                "Sid": "",
+                "Effect": "Allow",
+                "Action": "route53:ListHostedZonesByName",
+                "Resource": "*"
+              }
+            ]
+          }
         - PolicyName: TraefikRecommended
           PolicyDocument: {
             "Version": "2012-10-17",
@@ -36,42 +121,44 @@ services:
                 "Sid": "TraefikECSReadAccess",
                 "Effect": "Allow",
                 "Action": [
-                    "ecs:ListClusters",
-                    "ecs:DescribeClusters",
-                    "ecs:ListTasks",
-                    "ecs:DescribeTasks",
-                    "ecs:DescribeContainerInstances",
-                    "ecs:ListContainerInstances",
-                    "ecs:DescribeTaskDefinition",
-                    "ec2:DescribeInstances"
+                  "ecs:ListClusters",
+                  "ecs:DescribeClusters",
+                  "ecs:ListTasks",
+                  "ecs:DescribeTasks",
+                  "ecs:DescribeContainerInstances",
+                  "ecs:ListContainerInstances",
+                  "ecs:DescribeTaskDefinition",
+                  "ec2:DescribeInstances"
                 ],
                 "Resource": [
-                    "*"
+                  "*"
                 ]
               }
             ]
           }
-    deploy:
-      labels:
-        ecs.compute.platform: EXTERNAL
-    x-aws-min_percent: 0
-    x-aws-max_percent: 100
 
   whoami:
     ports:
       - 80/tcp
     deploy:
+      replicas: 1
       labels:
         ecs.task.family: whoami
         ecs.compute.platform: EXTERNAL
 
     labels:
       traefik.enable: "true"
-      traefik.http.routers.whoami.rule: Path(`/whoami`) # Override for your real domain name for this service.
+      traefik.http.routers.whoami.rule: Host(`whoami.bdd-testing.compose-x.io`)
+      traefik.http.routers.whoami.tls: "true"
+      traefik.http.routers.whoami.tls.certresolver: le
+      traefik.http.routers.whoami.entrypoints: websecure
+
     depends_on:
       - traefik
     x-aws-min_percent: 0
     x-aws-max_percent: 100
+    x-scaling:
+      Range: 1-6
 
 x-cluster:
   Lookup:

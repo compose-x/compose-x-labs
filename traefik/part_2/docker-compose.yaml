@@ -6,12 +6,18 @@ services:
   traefik:
     image: "traefik:latest"
     ports:
-      - "8000:80/tcp"
+      - "80:80/tcp"
+      - "443:443/tcp"
     deploy:
       resources:
         reservations:
           cpus: 0.1
           memory: 64MB
+        limits:
+          cpus: 0.2
+          memory: 256M
+      labels:
+        ecs.task.family: traefik
 
   whoami:
     expose:
@@ -24,6 +30,6 @@ services:
       traefik.http.routers.whoami.entrypoints: web
     deploy:
       resources:
-        reservations:
+        limits:
           cpus: 0.2
           memory: 128MB

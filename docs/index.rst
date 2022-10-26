@@ -71,6 +71,7 @@ Initialize your AWS Account for ECS Compose-X (see `requisites`_)
     :maxdepth: 1
 
     apps/traefik_ecs_part1.rst
+    apps/traefik_ecs_part2.rst
 
 .. toctree::
     :caption: Monitoring

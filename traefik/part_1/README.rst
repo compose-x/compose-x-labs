@@ -1,4 +1,7 @@
 
+.. meta::
+    :description: Compose-X Labs - Traefik part 1
+    :keywords: AWS, docker, compose, Traefik, ECS
 
 ===========================================
 Traefik Proxy in AWS with AWS ECS - Part 1
