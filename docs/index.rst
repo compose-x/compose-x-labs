@@ -90,6 +90,7 @@ Initialize your AWS Account for ECS Compose-X (see `requisites`_)
    :maxdepth: 1
    :caption: Kafka
 
+   kafka/conduktor_msk_demo
    kafka/connect
    kafka/restproxy
    kafka/kafdrop
